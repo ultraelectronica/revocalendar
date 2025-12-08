@@ -1,5 +1,5 @@
-import { CalendarEvent } from '../types';
-import { formatDateDisplay } from '../utils/dateUtils';
+import { CalendarEvent } from '@/types';
+import { formatDateDisplay } from '@/utils/dateUtils';
 
 interface EventListModalProps {
   isOpen: boolean;

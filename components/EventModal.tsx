@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CalendarEvent, EVENT_COLORS, EventColor } from '../types';
-import { generateEventId } from '../utils/dateUtils';
+import { CalendarEvent, EVENT_COLORS, EventColor } from '@/types';
+import { generateEventId } from '@/utils/dateUtils';
 
 interface EventModalProps {
   isOpen: boolean;

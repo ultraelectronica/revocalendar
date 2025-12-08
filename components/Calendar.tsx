@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { CalendarEvent } from '../types';
-import { formatDateString, WEEKDAYS, isToday } from '../utils/dateUtils';
+import { CalendarEvent } from '@/types';
+import { formatDateString, WEEKDAYS, isToday } from '@/utils/dateUtils';
 import CalendarDay from './CalendarDay';
 
 interface CalendarProps {

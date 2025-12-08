@@ -1,4 +1,4 @@
-import { CalendarEvent } from '../types';
+import { CalendarEvent } from '@/types';
 
 interface CalendarDayProps {
   day: number | null;

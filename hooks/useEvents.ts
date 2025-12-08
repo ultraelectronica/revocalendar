@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CalendarEvent } from '../types';
-import { loadEvents, saveEvents } from '../utils/storageUtils';
+import { CalendarEvent } from '@/types';
+import { loadEvents, saveEvents } from '@/utils/storageUtils';
 
 export function useEvents() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);

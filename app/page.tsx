@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
-import Calendar from './components/Calendar';
-import EventModal from './components/EventModal';
-import EventListModal from './components/EventListModal';
-import { useEvents } from './hooks/useEvents';
-import { CalendarEvent } from './types';
+'use client';
 
-function App() {
+import { useState, useEffect } from 'react';
+import Calendar from '@/components/Calendar';
+import EventModal from '@/components/EventModal';
+import EventListModal from '@/components/EventListModal';
+import { useEvents } from '@/hooks/useEvents';
+import { CalendarEvent } from '@/types';
+
+export default function Home() {
   const [nav, setNav] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isEventListOpen, setIsEventListOpen] = useState(false);
@@ -96,7 +98,7 @@ function App() {
   return (
     <div 
       className="min-h-screen flex justify-center items-start p-5 bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: "url('/assets/images/night5.jpg')" }}
+      style={{ backgroundImage: "url('/night5.jpg')" }}
     >
       <div className="w-full max-w-4xl bg-white/10 backdrop-blur-[50px] rounded-3xl border border-white/30 shadow-2xl p-5 mt-5">
         <div className="flex justify-between items-center mb-2.5 px-5">
@@ -155,6 +157,4 @@ function App() {
     </div>
   );
 }
-
-export default App;
 
