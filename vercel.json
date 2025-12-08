@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "echo 'No build step required'",
-  "outputDirectory": ".",
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist",
   "devCommand": "bun run dev",
   "installCommand": "bun install",
-  "framework": null,
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
