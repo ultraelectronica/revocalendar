@@ -1,6 +1,8 @@
+'use client';
+
 import { useMemo } from 'react';
 import { CalendarEvent } from '@/types';
-import { formatDateString, WEEKDAYS, isToday } from '@/utils/dateUtils';
+import { WEEKDAYS_SHORT, getMonthDates } from '@/utils/dateUtils';
 import CalendarDay from './CalendarDay';
 
 interface CalendarProps {
@@ -10,69 +12,49 @@ interface CalendarProps {
 }
 
 export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
-  const { days } = useMemo(() => {
+  const { days, month, year } = useMemo(() => {
     const dt = new Date();
-    if (nav !== 0) {
-      dt.setMonth(new Date().getMonth() + nav);
-    }
-
-    const today = new Date();
+    dt.setMonth(dt.getMonth() + nav);
+    
     const month = dt.getMonth();
     const year = dt.getFullYear();
+    const days = getMonthDates(year, month);
 
-    const firstDayOfMonth = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const dateString = firstDayOfMonth.toLocaleDateString('en-us', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    });
-    const paddingDays = WEEKDAYS.indexOf(dateString.split(', ')[0]);
-
-    const days: Array<{ day: number | null; date: string | null; isToday: boolean }> = [];
-
-    for (let i = 1; i <= paddingDays + daysInMonth; i++) {
-      if (i <= paddingDays) {
-        days.push({ day: null, date: null, isToday: false });
-      } else {
-        const currentDay = i - paddingDays;
-        const date = formatDateString(month, currentDay, year);
-        days.push({
-          day: currentDay,
-          date,
-          isToday: isToday(currentDay, month, year, nav),
-        });
-      }
-    }
-
-    return { days };
+    return { days, month, year };
   }, [nav]);
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-7 gap-1.5 p-2">
-        {WEEKDAYS.map(day => (
+      {/* Weekday Headers */}
+      <div className="grid grid-cols-7 gap-2 mb-3">
+        {WEEKDAYS_SHORT.map((day, index) => (
           <div
             key={day}
-            className="p-1.5 text-center font-semibold text-xs text-white/90"
+            className={`
+              py-2 text-center text-xs font-semibold uppercase tracking-wider
+              ${index === 0 || index === 6 ? 'text-white/40' : 'text-white/60'}
+            `}
           >
-            {day.slice(0, 3)}
+            {day}
           </div>
         ))}
+      </div>
+
+      {/* Days Grid */}
+      <div className="grid grid-cols-7 gap-2">
         {days.map((dayData, index) => (
           <CalendarDay
-            key={index}
+            key={`${dayData.date}-${index}`}
             day={dayData.day}
             date={dayData.date}
             isToday={dayData.isToday}
+            isCurrentMonth={dayData.isCurrentMonth}
             events={dayData.date ? events.filter(e => e.date === dayData.date) : []}
             onClick={() => dayData.date && onDayClick(dayData.date)}
+            animationDelay={index * 15}
           />
         ))}
       </div>
     </div>
   );
 }
-

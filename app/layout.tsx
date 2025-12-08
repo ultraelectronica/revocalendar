@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'FSVT Calendar',
-  description: 'A modern, feature-rich calendar application with event management capabilities',
+  title: 'LiveCalendar | Plan • Track • Achieve',
+  description: 'A beautiful, feature-rich calendar application with event management, notes, and smart planning tools.',
+  keywords: ['calendar', 'planner', 'events', 'productivity', 'schedule'],
 }
 
 export default function RootLayout({
@@ -13,8 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-black">{children}</body>
+      <body className="bg-[#0a0a12] min-h-screen antialiased">
+        {children}
+      </body>
     </html>
   )
 }
-

@@ -1,6 +1,16 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { CalendarEvent, EVENT_COLORS, EventColor } from '@/types';
-import { generateEventId } from '@/utils/dateUtils';
+import { 
+  CalendarEvent, 
+  EVENT_COLORS, 
+  EventColor, 
+  EventCategory, 
+  EventPriority,
+  CATEGORY_CONFIG,
+  PRIORITY_CONFIG 
+} from '@/types';
+import { generateEventId, formatDateDisplay, parseDateString } from '@/utils/dateUtils';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -19,26 +29,38 @@ export default function EventModal({
 }: EventModalProps) {
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState<EventColor>('#3b82f6');
+  const [selectedColor, setSelectedColor] = useState<EventColor>('#06b6d4');
+  const [category, setCategory] = useState<EventCategory>('other');
+  const [priority, setPriority] = useState<EventPriority>('medium');
   const [error, setError] = useState(false);
 
   useEffect(() => {
     if (editingEvent) {
       setTitle(editingEvent.title);
       setTime(editingEvent.time || '');
+      setEndTime(editingEvent.endTime || '');
       setDescription(editingEvent.description || '');
       setSelectedColor(editingEvent.color as EventColor);
+      setCategory(editingEvent.category);
+      setPriority(editingEvent.priority);
     } else {
       setTitle('');
       setTime('');
+      setEndTime('');
       setDescription('');
-      setSelectedColor('#3b82f6');
+      setSelectedColor('#06b6d4');
+      setCategory('other');
+      setPriority('medium');
     }
     setError(false);
   }, [editingEvent, isOpen]);
 
   if (!isOpen || !selectedDate) return null;
+
+  const dateObj = parseDateString(selectedDate);
+  const formattedDate = formatDateDisplay(dateObj);
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -51,8 +73,15 @@ export default function EventModal({
       date: selectedDate,
       title: title.trim(),
       time: time || null,
+      endTime: endTime || null,
       description: description.trim() || null,
       color: selectedColor,
+      category,
+      isRecurring: false,
+      recurrencePattern: null,
+      priority,
+      completed: editingEvent?.completed || false,
+      reminder: null,
     };
 
     onSave(event);
@@ -60,7 +89,7 @@ export default function EventModal({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && e.target instanceof HTMLInputElement) {
       e.preventDefault();
       handleSave();
     }
@@ -68,103 +97,193 @@ export default function EventModal({
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-10"
+        className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 fade-in"
         onClick={onClose}
       />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-[#14141e]/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl w-[90%] max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-5 border-b border-white/10">
-          <h2 className="text-2xl font-semibold text-white m-0">
-            {editingEvent ? 'Edit Event' : 'New Event'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="bg-transparent border-none text-white text-3xl leading-none p-0 w-8 h-8 flex items-center justify-center cursor-pointer rounded-full transition-all duration-300 hover:bg-white/10 hover:rotate-90"
-          >
-            ×
-          </button>
-        </div>
-        <div className="p-6">
-          <div className="mb-5">
-            <label className="block mb-2 font-medium text-sm text-white/90">
-              Event Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setError(false);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Enter event title"
-              className={`
-                w-full p-3 rounded-lg outline-none border bg-white/10 text-white font-sans text-sm
-                transition-all duration-300 placeholder:text-white/50
-                ${error 
-                  ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' 
-                  : 'border-white/20 focus:border-blue-500/60 focus:bg-white/15 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.2)]'
-                }
-              `}
-            />
-          </div>
-          <div className="mb-5">
-            <label className="block mb-2 font-medium text-sm text-white/90">
-              Time
-            </label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full p-3 rounded-lg outline-none border border-white/20 bg-white/10 text-white font-sans text-sm transition-all duration-300 focus:border-blue-500/60 focus:bg-white/15 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.2)]"
-            />
-          </div>
-          <div className="mb-5">
-            <label className="block mb-2 font-medium text-sm text-white/90">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add event description (optional)"
-              rows={3}
-              className="w-full p-3 rounded-lg outline-none border border-white/20 bg-white/10 text-white font-sans text-sm transition-all duration-300 resize-y min-h-[80px] placeholder:text-white/50 focus:border-blue-500/60 focus:bg-white/15 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.2)]"
-            />
-          </div>
-          <div className="mb-5">
-            <label className="block mb-2 font-medium text-sm text-white/90">
-              Color
-            </label>
-            <div className="flex gap-3 flex-wrap">
-              {EVENT_COLORS.map(color => (
-                <button
-                  key={color}
-                  onClick={() => setSelectedColor(color)}
-                  className={`
-                    w-10 h-10 rounded-full cursor-pointer transition-all duration-300 shadow-md
-                    ${selectedColor === color
-                      ? 'border-4 border-white scale-110 shadow-[0_0_0_3px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.4)]'
-                      : 'border-4 border-transparent hover:scale-110 hover:shadow-lg'
-                    }
-                  `}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Select color ${color}`}
-                />
-              ))}
+      
+      {/* Modal */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[95%] max-w-[520px] max-h-[90vh] overflow-hidden scale-in">
+        <div className="bg-slate-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="relative px-6 py-5 border-b border-white/10">
+            {/* Gradient accent */}
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 via-violet-500 to-orange-500" />
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold text-white mb-1">
+                  {editingEvent ? 'Edit Event' : 'New Event'}
+                </h2>
+                <p className="text-sm text-white/50">{formattedDate}</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all hover:rotate-90 duration-300"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
-          <div className="flex gap-3 justify-end mt-6 pt-5 border-t border-white/10">
-            <button
-              onClick={handleSave}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 font-semibold rounded-lg shadow-lg shadow-blue-500/40 transition-all duration-300 hover:from-blue-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/50"
-            >
-              Save
-            </button>
-            <button
-              onClick={onClose}
-              className="bg-white/10 text-white px-6 py-3 rounded-lg border border-white/20 transition-all duration-300 hover:bg-white/20 hover:-translate-y-0.5"
-            >
+
+          {/* Content */}
+          <div className="px-6 py-5 max-h-[60vh] overflow-y-auto space-y-5">
+            {/* Title */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-white/70">
+                Event Title <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setError(false);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="What's happening?"
+                autoFocus
+                className={`input-field ${error ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
+              />
+              {error && (
+                <p className="mt-1 text-xs text-red-400">Please enter a title</p>
+              )}
+            </div>
+
+            {/* Time Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-2 text-sm font-medium text-white/70">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="input-field font-mono"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-white/70">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="input-field font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-white/70">
+                Category
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {(Object.keys(CATEGORY_CONFIG) as EventCategory[]).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`
+                      p-2.5 rounded-xl text-xs font-medium transition-all duration-200
+                      flex flex-col items-center gap-1
+                      ${category === cat 
+                        ? 'bg-white/15 border-2 border-cyan-500/50 scale-105' 
+                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                      }
+                    `}
+                  >
+                    <span className="text-lg">{CATEGORY_CONFIG[cat].icon}</span>
+                    <span className="text-white/70">{CATEGORY_CONFIG[cat].label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-white/70">
+                Priority
+              </label>
+              <div className="flex gap-2">
+                {(Object.keys(PRIORITY_CONFIG) as EventPriority[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPriority(p)}
+                    className={`
+                      flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+                      ${priority === p 
+                        ? 'scale-105' 
+                        : 'bg-white/5 border border-white/10 hover:bg-white/10 text-white/70'
+                      }
+                    `}
+                    style={priority === p ? {
+                      backgroundColor: PRIORITY_CONFIG[p].color + '30',
+                      borderColor: PRIORITY_CONFIG[p].color + '50',
+                      color: PRIORITY_CONFIG[p].color,
+                      borderWidth: '2px',
+                    } : {}}
+                  >
+                    {PRIORITY_CONFIG[p].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-white/70">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add more details..."
+                rows={3}
+                className="input-field resize-y min-h-[80px]"
+              />
+            </div>
+
+            {/* Color */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-white/70">
+                Color
+              </label>
+              <div className="flex gap-3 flex-wrap">
+                {EVENT_COLORS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setSelectedColor(color)}
+                    className={`
+                      w-9 h-9 rounded-xl cursor-pointer transition-all duration-300
+                      ${selectedColor === color
+                        ? 'scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-slate-900'
+                        : 'hover:scale-110'
+                      }
+                    `}
+                    style={{ 
+                      backgroundColor: color,
+                      boxShadow: selectedColor === color ? `0 0 20px ${color}60` : 'none'
+                    }}
+                    aria-label={`Select color ${color}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-white/10 flex gap-3 justify-end bg-white/[0.02]">
+            <button onClick={onClose} className="btn-secondary">
               Cancel
+            </button>
+            <button onClick={handleSave} className="btn-primary">
+              {editingEvent ? 'Save Changes' : 'Create Event'}
             </button>
           </div>
         </div>
@@ -172,4 +291,3 @@ export default function EventModal({
     </>
   );
 }
-
