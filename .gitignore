@@ -37,4 +37,5 @@ coverage/
 # Misc
 *.pem
 .cache/
-
+.next
+.env
