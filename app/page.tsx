@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
+import FloatingLines from '@/components/FloatingLines';
 import { useEvents } from '@/hooks/useEvents';
 import { CalendarEvent } from '@/types';
 
@@ -96,11 +97,18 @@ export default function Home() {
   };
 
   return (
-    <div 
-      className="min-h-screen flex justify-center items-start p-5 bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: "url('/night5.jpg')" }}
-    >
-      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-[50px] rounded-3xl border border-white/30 shadow-2xl p-5 mt-5">
+    <div className="min-h-screen flex justify-center items-start p-5 relative overflow-hidden">
+      <div className="fixed inset-0 z-0">
+        <FloatingLines 
+          enabledWaves={['top', 'middle', 'bottom']}
+          lineCount={[6, 6, 6]}
+          animationSpeed={1}
+          interactive={true}
+          parallax={true}
+          mixBlendMode="screen"
+        />
+      </div>
+      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-[50px] rounded-3xl border border-white/30 shadow-2xl p-5 mt-5 relative z-10">
         <div className="flex justify-between items-center mb-2.5 px-5">
           <div className="text-white text-3xl font-semibold">
             {getMonthDisplay()}
