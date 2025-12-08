@@ -1,209 +1,533 @@
 @import url('https://fonts.googleapis.com/css?family=Poppins:200,300,400,500,600,700,800,900&display=swap');
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     display: flex;
-    margin-top: 50px;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
     justify-content: center;
+    align-items: flex-start;
     background-image: url('night5.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     font-family: 'Poppins', sans-serif;
 }
 
 button {
-    width: 75px;
     cursor: pointer;
     border: none;
     outline: none;
-    padding: 5px;
-    border-radius: 5px;
+    padding: 8px 16px;
+    border-radius: 8px;
     color: white;
-    background-color: rgba(255, 255, 255, 0);
-    box-shadow: 0px 0px 3px #ffffff;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
 }
 
 #header {
-    padding: 10px;
+    padding: 20px;
     color: white;
-    font-size: 26px;
-    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 600;
     display: flex;
     justify-content: space-between;
-    margin: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#headerButtons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#header button {
+    width: auto;
+    min-width: 50px;
+    padding: 10px 15px;
+    background-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 #header button:hover {
-    background-color: #b1aeb19d;
-    color: white;
-    transition: all ease 0.4s;
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-#header button.active {
-    background-color: #3f3b3f;
-    color: #3f3b3f;
+#todayButton {
+    font-size: 14px;
+    padding: 10px 20px;
 }
 
 #container {
-    width: 770px;
+    width: 100%;
+    max-width: 900px;
     background: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(50px);
-    border-radius: 20px;
-    margin-top: 20px;
-    margin-left: 20px;
+    border-radius: 24px;
+    padding: 20px;
+    margin: 0 auto;
 }
 
 #weekdays {
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
     color: white;
-    margin-top: 20px;
     margin-bottom: 10px;
-    margin-right: 70px;
+    padding: 0 8px;
 }
 
 #weekdays div {
-    width: 100px;
-    padding: 10px;
-    margin: 5px;
+    padding: 12px;
     text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    opacity: 0.9;
 }
 
 #calendar {
     width: 100%;
-    margin: auto;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding: 8px;
 }
 
 .day {
-    width: 100px;
-    padding: 15px;
-    height: 100px;
+    min-height: 120px;
+    padding: 10px;
     cursor: pointer;
-    box-sizing: border-box;
-    background-color: rgba(255, 255, 255, 0);
-    margin: 5px;
-    box-shadow: 0px 0px 3px #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    color: white;
-    overflow: hidden;
-    border-radius: 25px;
-    text-align: center;
-    margin-bottom: px;
+    transition: all 0.3s ease;
+    position: relative;
 }
 
 .day:hover {
-    background-color: #908a92c5;
-    color: white;
-    transition: all ease 0.4s;
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.day+#currentDay {
-    background-color: #ada7a7b2;
+.day.today {
+    background-color: rgba(59, 130, 246, 0.3);
+    border: 2px solid rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.day.today .day-number {
+    font-weight: 700;
+    color: #93c5fd;
+}
+
+.day-number {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.events-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+    overflow: hidden;
 }
 
 .event {
-    font-size: 9px;
-    padding: 3px;
-    background: rgba(46, 45, 45, 0.623);
-    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(25px);
-    border-radius: 20px;
+    font-size: 11px;
+    padding: 4px 6px;
+    border-radius: 6px;
     color: white;
-    max-height: 55px;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+    opacity: 0.95;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.event-more {
+    font-size: 10px;
+    padding: 4px 6px;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+    opacity: 0.8;
 }
 
 .padding {
     cursor: default !important;
-    background-color: #fffcff00 !important;
+    background-color: transparent !important;
+    border: none !important;
     box-shadow: none !important;
+    opacity: 0.3;
+}
+
+.padding:hover {
+    background-color: transparent !important;
+    transform: none !important;
 }
 
 #newEventModal,
-#deleteEventModal {
+#eventListModal {
     display: none;
     z-index: 20;
-    padding: 25px;
-    background: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(25px);
+    background: rgba(20, 20, 30, 0.95);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(30px);
     border-radius: 20px;
-    width: 350px;
-    top: 100px;
-    left: calc(50% - 175px);
-    position: absolute;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: fixed;
     font-family: 'Poppins', sans-serif;
     color: white;
 }
 
-#eventTitleInput {
-    padding: 10px;
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: 25px;
-    border-radius: 3px;
-    outline: none;
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.close-x {
+    background: none;
     border: none;
-    box-shadow: 0px 0px 3px gray;
+    color: white;
+    font-size: 32px;
+    line-height: 1;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.close-x:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#eventTitleInput,
+#eventTimeInput,
+#eventDescriptionInput {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    outline: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#eventTitleInput:focus,
+#eventTimeInput:focus,
+#eventDescriptionInput:focus {
+    border-color: rgba(59, 130, 246, 0.6);
+    background-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+#eventTitleInput::placeholder,
+#eventDescriptionInput::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 #eventTitleInput.error {
-    border: 2px solid red;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
 }
 
-#cancelButton,
-#deleteButton {
-    border: white;
-    border-radius: 0%;
-    background-color: #00000000;
+#eventDescriptionInput {
+    resize: vertical;
+    min-height: 80px;
+}
+
+#colorPicker {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.color-option {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.color-option.selected {
+    border-color: white;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: white;
-    font-family: 'Poppins', sans-serif;
+    padding: 12px 24px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
-#cancelButton:hover,
-#deleteButton:hover {
-    background-color: #908a92c5;
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+}
+
+.btn-secondary {
+    background-color: rgba(255, 255, 255, 0.1);
     color: white;
-    transition: all ease 0.4s;
+    padding: 12px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-#saveButton,
-#closeButton {
-    background-color: #948b8b;
-    border-radius: 0%;
-    color: white;
-    font-family: 'Poppins', sans-serif;
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
 }
 
-#saveButton:hover,
-#closeButton:hover {
-    background-color: #2b2a2b;
-    color: white;
-    transition: all ease 0.4s;
+/* Event List Modal Styles */
+#eventListContent {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
 }
 
-#eventText {
+.no-events {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.event-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.event-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px);
+}
+
+.event-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.event-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.event-item-info {
+    flex: 1;
+}
+
+.event-item-title {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.event-item-time {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.event-item-description {
     font-size: 14px;
-    margin-bottom: 40px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+.event-item-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.btn-edit,
+.btn-delete {
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-edit {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: white;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+.btn-edit:hover {
+    background-color: rgba(59, 130, 246, 0.5);
+}
+
+.btn-delete {
+    background-color: rgba(239, 68, 68, 0.3);
+    color: white;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.btn-delete:hover {
+    background-color: rgba(239, 68, 68, 0.5);
 }
 
 #modalBackDrop {
     display: none;
-    top: 0px;
-    left: 0px;
+    top: 0;
+    left: 0;
     z-index: 10;
     width: 100vw;
     height: 100vh;
-    position: absolute;
-    background-color: #3f3b3f81;
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #container {
+        padding: 15px;
+        border-radius: 16px;
+    }
+
+    #header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    #headerButtons {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    #weekdays div {
+        font-size: 12px;
+        padding: 8px 4px;
+    }
+
+    .day {
+        min-height: 100px;
+        padding: 8px;
+    }
+
+    .day-number {
+        font-size: 14px;
+    }
+
+    .event {
+        font-size: 10px;
+        padding: 3px 5px;
+    }
+
+    #newEventModal,
+    #eventListModal {
+        width: 95%;
+        max-height: 85vh;
+    }
+
+    .modal-header h2 {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+
+    .day {
+        min-height: 80px;
+    }
+
+    .event {
+        font-size: 9px;
+    }
 }
