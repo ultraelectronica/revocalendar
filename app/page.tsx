@@ -65,10 +65,10 @@ export default function Home() {
   
   const { 
     notes, 
-    updateNotes, 
-    isSaving, 
-    charCount, 
-    wordCount 
+    addNote,
+    updateNote,
+    deleteNote,
+    togglePinNote,
   } = useNotes();
 
   // Keyboard shortcuts
@@ -348,10 +348,10 @@ export default function Home() {
                 ) : (
                   <NotesSection
                     notes={notes}
-                    onNotesChange={updateNotes}
-                    isSaving={isSaving}
-                    charCount={charCount}
-                    wordCount={wordCount}
+                    onAddNote={addNote}
+                    onUpdateNote={updateNote}
+                    onDeleteNote={deleteNote}
+                    onTogglePin={togglePinNote}
                   />
                 )}
               </div>

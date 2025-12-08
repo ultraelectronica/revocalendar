@@ -1,48 +1,77 @@
 import { useState, useEffect, useCallback } from 'react';
-import { loadSingleNote, saveSingleNote } from '@/utils/storageUtils';
+import { Note } from '@/types';
+import { loadNotes, saveNotes } from '@/utils/storageUtils';
 
 export function useNotes() {
-  const [notes, setNotes] = useState<string>('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   useEffect(() => {
-    setNotes(loadSingleNote());
+    setNotes(loadNotes());
   }, []);
 
-  const updateNotes = useCallback((newNotes: string) => {
-    setNotes(newNotes);
-    setIsSaving(true);
-    
-    // Debounced save
-    const timeoutId = setTimeout(() => {
-      saveSingleNote(newNotes);
-      setIsSaving(false);
-      setLastSaved(new Date());
-    }, 500);
+  const addNote = useCallback((content: string, color: string | null = null) => {
+    const newNote: Note = {
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+      content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      pinned: false,
+      color,
+    };
+    const updatedNotes = [newNote, ...notes];
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+    return newNote;
+  }, [notes]);
 
-    return () => clearTimeout(timeoutId);
-  }, []);
+  const updateNote = useCallback((noteId: string, content: string) => {
+    const updatedNotes = notes.map(note =>
+      note.id === noteId
+        ? { ...note, content, updatedAt: new Date().toISOString() }
+        : note
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+  }, [notes]);
 
-  const clearNotes = useCallback(() => {
-    setNotes('');
-    saveSingleNote('');
-    setLastSaved(new Date());
-  }, []);
+  const deleteNote = useCallback((noteId: string) => {
+    const updatedNotes = notes.filter(note => note.id !== noteId);
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+  }, [notes]);
 
-  // Character and word count
-  const charCount = notes.length;
-  const wordCount = notes.trim() ? notes.trim().split(/\s+/).length : 0;
-  const lineCount = notes.split('\n').length;
+  const togglePinNote = useCallback((noteId: string) => {
+    const updatedNotes = notes.map(note =>
+      note.id === noteId
+        ? { ...note, pinned: !note.pinned }
+        : note
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+  }, [notes]);
+
+  const setNoteColor = useCallback((noteId: string, color: string | null) => {
+    const updatedNotes = notes.map(note =>
+      note.id === noteId
+        ? { ...note, color }
+        : note
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+  }, [notes]);
+
+  // Sort notes: pinned first, then by updated date
+  const sortedNotes = [...notes].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 
   return {
-    notes,
-    updateNotes,
-    clearNotes,
-    isSaving,
-    lastSaved,
-    charCount,
-    wordCount,
-    lineCount,
+    notes: sortedNotes,
+    addNote,
+    updateNote,
+    deleteNote,
+    togglePinNote,
+    setNoteColor,
   };
 }

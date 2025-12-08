@@ -228,8 +228,8 @@ export default function UpcomingPlans({
       {groupedEvents.later.length > 5 && (
         <div className="text-[10px] sm:text-xs text-white/30 text-center py-2">
           +{groupedEvents.later.length - 5} more events later
-        </div>
-      )}
+                  </div>
+                )}
     </div>
   );
 }

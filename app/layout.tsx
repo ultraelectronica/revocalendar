@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: 'A beautiful, feature-rich calendar application with event management, notes, and smart planning tools.',
   keywords: ['calendar', 'planner', 'events', 'productivity', 'schedule'],
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: '/favicon.svg',
   },
 }
 

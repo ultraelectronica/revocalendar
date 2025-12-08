@@ -15,7 +15,7 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
   const { days } = useMemo(() => {
     const dt = new Date();
     dt.setMonth(dt.getMonth() + nav);
-    
+
     const month = dt.getMonth();
     const year = dt.getFullYear();
     const days = getMonthDates(year, month);

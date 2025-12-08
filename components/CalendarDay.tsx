@@ -61,7 +61,7 @@ export default function CalendarDay({
               : 'text-white/30'
           }
         `}>
-          {day}
+        {day}
         </span>
         
         {/* Priority indicator */}
@@ -80,10 +80,10 @@ export default function CalendarDay({
         {/* Mobile: Show dots for events */}
         <div className="sm:hidden flex gap-0.5 flex-wrap">
           {events.slice(0, 4).map((event) => (
-            <div
-              key={event.id}
+          <div
+            key={event.id}
               className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: event.color }}
+            style={{ backgroundColor: event.color }}
             />
           ))}
           {events.length > 4 && (
@@ -113,15 +113,15 @@ export default function CalendarDay({
                 <span className="text-[7px] lg:text-[8px] hidden lg:inline">{CATEGORY_CONFIG[event.category].icon}</span>
                 <span className="truncate">{event.title}</span>
               </span>
-            </div>
-          ))}
+          </div>
+        ))}
           
-          {moreCount > 0 && (
+        {moreCount > 0 && (
             <div className="text-[8px] lg:text-[9px] px-1 lg:px-1.5 py-0.5 text-white/50 font-medium">
               +{moreCount} more
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
       </div>
 
       {/* Event count badge - Desktop only */}

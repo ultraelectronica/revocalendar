@@ -114,19 +114,19 @@ export default function EventModal({
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
-                  {editingEvent ? 'Edit Event' : 'New Event'}
-                </h2>
+            {editingEvent ? 'Edit Event' : 'New Event'}
+          </h2>
                 <p className="text-xs sm:text-sm text-white/50">{formattedDate}</p>
               </div>
-              <button
-                onClick={onClose}
+          <button
+            onClick={onClose}
                 className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all hover:rotate-90 duration-300"
-              >
+          >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
-            </div>
+          </button>
+        </div>
           </div>
 
           {/* Content */}
@@ -135,15 +135,15 @@ export default function EventModal({
             <div>
               <label className="block mb-1.5 sm:mb-2 text-xs sm:text-sm font-medium text-white/70">
                 Event Title <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setError(false);
-                }}
-                onKeyDown={handleKeyDown}
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setError(false);
+              }}
+              onKeyDown={handleKeyDown}
                 placeholder="What's happening?"
                 autoFocus
                 className={`input-field text-sm sm:text-base ${error ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
@@ -151,18 +151,18 @@ export default function EventModal({
               {error && (
                 <p className="mt-1 text-xs text-red-400">Please enter a title</p>
               )}
-            </div>
+          </div>
 
             {/* Time Row */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block mb-1.5 sm:mb-2 text-xs sm:text-sm font-medium text-white/70">
                   Start Time
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
+            </label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
                   className="input-field font-mono text-sm"
                 />
               </div>
@@ -175,8 +175,8 @@ export default function EventModal({
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="input-field font-mono text-sm"
-                />
-              </div>
+            />
+          </div>
             </div>
 
             {/* Category */}
@@ -238,43 +238,43 @@ export default function EventModal({
             {/* Description */}
             <div>
               <label className="block mb-1.5 sm:mb-2 text-xs sm:text-sm font-medium text-white/70">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add more details..."
-                rows={3}
+              rows={3}
                 className="input-field resize-y min-h-[70px] sm:min-h-[80px] text-sm"
-              />
-            </div>
+            />
+          </div>
 
             {/* Color */}
             <div>
               <label className="block mb-1.5 sm:mb-2 text-xs sm:text-sm font-medium text-white/70">
-                Color
-              </label>
+              Color
+            </label>
               <div className="flex gap-2 sm:gap-3 flex-wrap">
-                {EVENT_COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`
+              {EVENT_COLORS.map(color => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className={`
                       w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-300
-                      ${selectedColor === color
+                    ${selectedColor === color
                         ? 'scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-slate-900'
                         : 'hover:scale-110'
-                      }
-                    `}
+                    }
+                  `}
                     style={{ 
                       backgroundColor: color,
                       boxShadow: selectedColor === color ? `0 0 20px ${color}60` : 'none'
                     }}
-                    aria-label={`Select color ${color}`}
-                  />
-                ))}
-              </div>
+                  aria-label={`Select color ${color}`}
+                />
+              ))}
             </div>
+          </div>
           </div>
 
           {/* Footer */}

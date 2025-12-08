@@ -22,7 +22,7 @@ export function useEvents() {
   const updateEvent = useCallback((eventId: string, updatedEvent: CalendarEvent) => {
     setEvents(prev => {
       const newEvents = prev.map(e => e.id === eventId ? updatedEvent : e);
-      saveEvents(newEvents);
+    saveEvents(newEvents);
       return newEvents;
     });
   }, []);
@@ -30,7 +30,7 @@ export function useEvents() {
   const deleteEvent = useCallback((eventId: string) => {
     setEvents(prev => {
       const newEvents = prev.filter(e => e.id !== eventId);
-      saveEvents(newEvents);
+    saveEvents(newEvents);
       return newEvents;
     });
   }, []);
@@ -40,7 +40,7 @@ export function useEvents() {
       const newEvents = prev.map(e => 
         e.id === eventId ? { ...e, completed: !e.completed } : e
       );
-      saveEvents(newEvents);
+    saveEvents(newEvents);
       return newEvents;
     });
   }, []);
