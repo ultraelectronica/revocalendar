@@ -99,12 +99,14 @@ export default function EventModal({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 fade-in"
+        className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 fade-in flex items-center justify-center p-4"
         onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-50 sm:w-[95%] sm:max-w-[520px] sm:max-h-[90vh] overflow-hidden scale-in flex flex-col">
+      >
+        {/* Modal */}
+        <div 
+          className="w-full max-w-[520px] max-h-[90vh] overflow-hidden scale-in flex flex-col z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="bg-slate-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex-1 flex flex-col max-h-full">
           {/* Header */}
           <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-white/10 flex-shrink-0">
@@ -287,6 +289,7 @@ export default function EventModal({
             </button>
           </div>
         </div>
+      </div>
       </div>
     </>
   );

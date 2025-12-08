@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
@@ -154,19 +154,22 @@ export default function Home() {
 
   const { month: currentMonth, year: currentYear } = getCurrentDate();
 
+  // Memoize background props to prevent re-renders
+  const backgroundProps = useMemo(() => ({
+    linesGradient: ['#06b6d4', '#8b5cf6', '#f97316', '#10b981'] as string[],
+    enabledWaves: ['top', 'middle', 'bottom'] as Array<'top' | 'middle' | 'bottom'>,
+    lineCount: [5, 7, 5] as number[],
+    animationSpeed: 0.8,
+    interactive: true,
+    parallax: true,
+    mixBlendMode: 'screen' as const,
+  }), []);
+
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">
       {/* Background Animation */}
       <div className="fixed inset-0 z-0">
-        <FloatingLines 
-          linesGradient={['#06b6d4', '#8b5cf6', '#f97316', '#10b981']}
-          enabledWaves={['top', 'middle', 'bottom']}
-          lineCount={[5, 7, 5]}
-          animationSpeed={0.8}
-          interactive={true}
-          parallax={true}
-          mixBlendMode="screen"
-        />
+        <FloatingLines {...backgroundProps} />
       </div>
 
       {/* Main Content */}
@@ -240,8 +243,8 @@ export default function Home() {
         )}
 
         {/* Main Layout */}
-        <main className="flex-1 p-3 sm:p-4 lg:p-6">
-          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-5">
             {/* Left Sidebar - Stats (Desktop only) */}
             <aside className="w-72 flex-shrink-0 hidden lg:block">
               <QuickStats stats={stats} />
