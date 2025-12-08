@@ -52,11 +52,11 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-7 gap-2 p-2">
+      <div className="grid grid-cols-7 gap-1.5 p-2">
         {WEEKDAYS.map(day => (
           <div
             key={day}
-            className="p-3 text-center font-semibold text-sm text-white/90"
+            className="p-1.5 text-center font-semibold text-xs text-white/90"
           >
             {day.slice(0, 3)}
           </div>

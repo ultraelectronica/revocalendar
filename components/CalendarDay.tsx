@@ -11,18 +11,18 @@ interface CalendarDayProps {
 export default function CalendarDay({ day, date, isToday, events, onClick }: CalendarDayProps) {
   if (day === null) {
     return (
-      <div className="min-h-[120px] p-2 opacity-30" />
+      <div className="min-h-[70px] p-1 opacity-30" />
     );
   }
 
-  const eventsToShow = events.slice(0, 3);
-  const moreCount = events.length - 3;
+  const eventsToShow = events.slice(0, 2);
+  const moreCount = events.length - 2;
 
   return (
     <div
       onClick={onClick}
       className={`
-        min-h-[120px] p-2 rounded-xl cursor-pointer
+        min-h-[70px] p-1.5 rounded-lg cursor-pointer
         flex flex-col transition-all duration-300
         ${isToday 
           ? 'bg-blue-500/30 border-2 border-blue-500/60 shadow-lg shadow-blue-500/40' 
@@ -30,22 +30,22 @@ export default function CalendarDay({ day, date, isToday, events, onClick }: Cal
         }
       `}
     >
-      <div className={`text-base font-semibold mb-1.5 ${isToday ? 'text-blue-200 font-bold' : 'text-white'}`}>
+      <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-blue-200 font-bold' : 'text-white'}`}>
         {day}
       </div>
-      <div className="flex-1 flex flex-col gap-1 mt-1 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
         {eventsToShow.map(event => (
           <div
             key={event.id}
-            className="text-xs px-1.5 py-1 rounded-md text-white overflow-hidden text-ellipsis whitespace-nowrap font-medium opacity-95 shadow-md"
+            className="text-[10px] px-1 py-0.5 rounded text-white overflow-hidden text-ellipsis whitespace-nowrap font-medium opacity-95 shadow-sm"
             style={{ backgroundColor: event.color }}
           >
             {event.title}
           </div>
         ))}
         {moreCount > 0 && (
-          <div className="text-[10px] px-1.5 py-1 text-white/80 italic opacity-80">
-            +{moreCount} more
+          <div className="text-[9px] px-1 py-0.5 text-white/80 italic opacity-80">
+            +{moreCount}
           </div>
         )}
       </div>
