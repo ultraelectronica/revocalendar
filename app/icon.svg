@@ -1,0 +1,22 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Planet body -->
+  <circle cx="12" cy="12" r="6" fill="url(#planetGradient)" />
+  <!-- Ring - behind -->
+  <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" stroke-width="1.5" fill="none" 
+    stroke-dasharray="0 15.7 31.4" transform="rotate(-20 12 12)" />
+  <!-- Ring - front -->
+  <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" stroke-width="1.5" fill="none"
+    stroke-dasharray="31.4 15.7 0" transform="rotate(-20 12 12)" />
+  <defs>
+    <linearGradient id="planetGradient" x1="6" y1="6" x2="18" y2="18">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="ringGradient" x1="2" y1="12" x2="22" y2="12">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="50%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+  </defs>
+</svg>
+
