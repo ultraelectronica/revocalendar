@@ -11,7 +11,7 @@ body {
     min-height: 100vh;
     justify-content: center;
     align-items: flex-start;
-    background-image: url('night5.jpg');
+    background-image: url('../images/night5.jpg');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;

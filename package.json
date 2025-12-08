@@ -1,0 +1,26 @@
+{
+  "name": "livecalendar",
+  "version": "1.0.0",
+  "description": "A modern, feature-rich calendar application with event management capabilities",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run dev:server",
+    "dev:server": "bun --bun run scripts/dev-server.ts",
+    "start": "bun run dev",
+    "build": "echo 'No build step required for static site'",
+    "preview": "bun run dev"
+  },
+  "keywords": [
+    "calendar",
+    "events",
+    "scheduler",
+    "web-app"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {}
+}
+
