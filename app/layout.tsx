@@ -2,9 +2,12 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'LiveCalendar | Plan • Track • Achieve',
+  title: 'Revo | Plan • Track • Achieve',
   description: 'A beautiful, feature-rich calendar application with event management, notes, and smart planning tools.',
   keywords: ['calendar', 'planner', 'events', 'productivity', 'schedule'],
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

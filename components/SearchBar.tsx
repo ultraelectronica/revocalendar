@@ -87,35 +87,35 @@ export default function SearchBar({
           }}
           onFocus={() => setIsOpen(true)}
           placeholder="Search events..."
-          className="w-full pl-10 pr-16 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:bg-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300"
+          className="w-full pl-9 sm:pl-10 pr-12 sm:pr-16 py-2 sm:py-2.5 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs sm:text-sm focus:outline-none focus:bg-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300"
         />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded bg-white/10 text-white/40 text-xs font-mono hidden sm:inline-block">
+        <kbd className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 px-1.5 sm:px-2 py-0.5 rounded bg-white/10 text-white/40 text-[10px] sm:text-xs font-mono hidden sm:inline-block">
           ⌘K
         </kbd>
       </div>
 
       {/* Dropdown Results */}
       {isOpen && searchQuery.trim() && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 scale-in">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-lg sm:rounded-xl shadow-2xl overflow-hidden z-50 scale-in">
           {filteredEvents.length > 0 ? (
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-64 sm:max-h-80 overflow-y-auto">
               {filteredEvents.map((event, index) => (
                 <button
                   key={event.id}
                   onClick={() => handleEventClick(event)}
-                  className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors text-left ${
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors text-left ${
                     index !== filteredEvents.length - 1 ? 'border-b border-white/5' : ''
                   }`}
                 >
                   <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: event.color }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-medium text-sm truncate">
+                    <div className="text-white font-medium text-xs sm:text-sm truncate">
                       {event.title}
                     </div>
-                    <div className="text-white/50 text-xs flex items-center gap-2">
+                    <div className="text-white/50 text-[10px] sm:text-xs flex items-center gap-1 sm:gap-2">
                       <span>{getRelativeDay(event.date)}</span>
                       {event.time && (
                         <>
@@ -126,13 +126,13 @@ export default function SearchBar({
                     </div>
                   </div>
                   {event.completed && (
-                    <span className="text-emerald-400 text-xs">✓</span>
+                    <span className="text-emerald-400 text-[10px] sm:text-xs">✓</span>
                   )}
                 </button>
               ))}
             </div>
           ) : (
-            <div className="px-4 py-8 text-center text-white/40 text-sm">
+            <div className="px-4 py-6 sm:py-8 text-center text-white/40 text-xs sm:text-sm">
               No events found for "{searchQuery}"
             </div>
           )}
@@ -141,4 +141,3 @@ export default function SearchBar({
     </div>
   );
 }
-

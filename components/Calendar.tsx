@@ -12,7 +12,7 @@ interface CalendarProps {
 }
 
 export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
-  const { days, month, year } = useMemo(() => {
+  const { days } = useMemo(() => {
     const dt = new Date();
     dt.setMonth(dt.getMonth() + nav);
     
@@ -26,22 +26,23 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
   return (
     <div className="w-full">
       {/* Weekday Headers */}
-      <div className="grid grid-cols-7 gap-2 mb-3">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-3">
         {WEEKDAYS_SHORT.map((day, index) => (
           <div
             key={day}
             className={`
-              py-2 text-center text-xs font-semibold uppercase tracking-wider
+              py-1 sm:py-2 text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wider
               ${index === 0 || index === 6 ? 'text-white/40' : 'text-white/60'}
             `}
           >
-            {day}
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden">{day.charAt(0)}</span>
           </div>
         ))}
       </div>
 
       {/* Days Grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
         {days.map((dayData, index) => (
           <CalendarDay
             key={`${dayData.date}-${index}`}
@@ -51,7 +52,7 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
             isCurrentMonth={dayData.isCurrentMonth}
             events={dayData.date ? events.filter(e => e.date === dayData.date) : []}
             onClick={() => dayData.date && onDayClick(dayData.date)}
-            animationDelay={index * 15}
+            animationDelay={index * 10}
           />
         ))}
       </div>
