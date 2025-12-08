@@ -9,6 +9,7 @@ import UpcomingPlans from '@/components/UpcomingPlans';
 import NotesSection from '@/components/NotesSection';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
+import FocusTimer from '@/components/FocusTimer';
 import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
 import { CalendarEvent } from '@/types';
@@ -223,7 +224,7 @@ export default function Home() {
               </button>
             </div>
           </div>
-          
+
           {/* Mobile Search Bar */}
           <div className="sm:hidden mt-3">
             <SearchBar 
@@ -245,9 +246,10 @@ export default function Home() {
         {/* Main Layout */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-5">
-            {/* Left Sidebar - Stats (Desktop only) */}
+            {/* Left Sidebar - Stats & Timer (Desktop only) */}
             <aside className="w-72 flex-shrink-0 hidden lg:block">
               <QuickStats stats={stats} />
+              <FocusTimer />
             </aside>
 
             {/* Main Calendar */}
@@ -294,12 +296,12 @@ export default function Home() {
                 </div>
 
                 {/* Calendar Grid */}
-                <Calendar
-                  nav={nav}
-                  events={events}
-                  onDayClick={handleDayClick}
-                />
-              </div>
+          <Calendar
+            nav={nav}
+            events={events}
+            onDayClick={handleDayClick}
+          />
+        </div>
             </section>
 
             {/* Right Sidebar - Plans & Notes */}
@@ -342,15 +344,15 @@ export default function Home() {
               <div className="glass-card p-3 sm:p-4 flex-1 min-h-[300px] lg:min-h-0 overflow-hidden">
                 {sidebarTab === 'plans' ? (
                   <div className="h-full max-h-[400px] lg:max-h-none overflow-y-auto pr-1">
-                    <UpcomingPlans
+              <UpcomingPlans
                       groupedEvents={groupedUpcomingEvents}
-                      onEventClick={handleEditEvent}
+                onEventClick={handleEditEvent}
                       onToggleComplete={toggleEventCompletion}
-                    />
-                  </div>
+              />
+            </div>
                 ) : (
-                  <NotesSection
-                    notes={notes}
+            <NotesSection
+              notes={notes}
                     onAddNote={addNote}
                     onUpdateNote={updateNote}
                     onDeleteNote={deleteNote}

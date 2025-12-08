@@ -232,8 +232,8 @@ export default function EventListModal({
               </button>
             </div>
           </div>
+          </div>
         </div>
-      </div>
       </div>
     </>
   );

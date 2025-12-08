@@ -180,7 +180,7 @@ export default function NotesSection({
               {editingNoteId === note.id ? (
                 // Edit Mode
                 <>
-                  <textarea
+      <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={3}

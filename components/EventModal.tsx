@@ -288,8 +288,8 @@ export default function EventModal({
               {editingEvent ? 'Save Changes' : 'Create Event'}
             </button>
           </div>
+          </div>
         </div>
-      </div>
       </div>
     </>
   );
