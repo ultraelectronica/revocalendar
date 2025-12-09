@@ -24,6 +24,8 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/supabase-js": "^2.87.1",
     "@types/three": "^0.181.0",
     "add": "^2.0.6",
     "class-variance-authority": "^0.7.1",
