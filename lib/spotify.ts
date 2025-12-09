@@ -238,6 +238,14 @@ export async function exchangeCodeForTokens(
 
 // Refresh access token
 export async function refreshAccessToken(refreshToken: string): Promise<SpotifyTokens> {
+  if (!refreshToken || typeof refreshToken !== 'string' || refreshToken.trim() === '') {
+    throw new Error('Invalid refresh token provided');
+  }
+
+  if (!SPOTIFY_CONFIG.clientId) {
+    throw new Error('Spotify client ID is not configured');
+  }
+
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -251,15 +259,29 @@ export async function refreshAccessToken(refreshToken: string): Promise<SpotifyT
   });
 
   if (!response.ok) {
-    throw new Error('Failed to refresh token');
+    const errorData = await response.json().catch(() => ({}));
+    const errorMsg = errorData.error_description || errorData.error || `HTTP ${response.status}`;
+    
+    // Common error explanations
+    if (errorData.error === 'invalid_grant') {
+      throw new Error(
+        `Token refresh failed: ${errorMsg}. The refresh token may be expired or invalid. Please reconnect to Spotify.`
+      );
+    }
+    
+    throw new Error(`Token refresh failed: ${errorMsg}`);
   }
 
   const data = await response.json();
   
+  if (!data.access_token) {
+    throw new Error('Token refresh response missing access_token');
+  }
+  
   return {
     access_token: data.access_token,
     refresh_token: data.refresh_token || refreshToken,
-    expires_at: Date.now() + data.expires_in * 1000,
+    expires_at: Date.now() + (data.expires_in || 3600) * 1000,
   };
 }
 
@@ -268,10 +290,25 @@ export class SpotifyAPI {
   private accessToken: string;
 
   constructor(accessToken: string) {
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim() === '') {
+      throw new Error('Invalid access token provided to SpotifyAPI');
+    }
+    this.accessToken = accessToken;
+  }
+
+  // Method to update the access token (useful for token refresh)
+  updateToken(accessToken: string): void {
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim() === '') {
+      throw new Error('Invalid access token provided to updateToken');
+    }
     this.accessToken = accessToken;
   }
 
   private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    if (!this.accessToken) {
+      throw new Error('No access token available');
+    }
+
     const response = await fetch(`https://api.spotify.com/v1${endpoint}`, {
       ...options,
       headers: {
@@ -287,6 +324,18 @@ export class SpotifyAPI {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      
+      // Handle specific error cases
+      if (response.status === 401) {
+        const errorMessage = error.error?.message || 'Unauthorized';
+        throw new Error(`Spotify API 401: ${errorMessage}. Token may be expired or invalid.`);
+      }
+      
+      if (response.status === 403) {
+        const errorMessage = error.error?.message || 'Forbidden';
+        throw new Error(`Spotify API 403: ${errorMessage}. Insufficient permissions or token scope.`);
+      }
+      
       throw new Error(error.error?.message || `Spotify API error: ${response.status}`);
     }
 

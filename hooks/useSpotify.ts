@@ -163,12 +163,27 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
       const stored = localStorage.getItem(TOKENS_STORAGE_KEY);
       if (stored) {
         const tokens = JSON.parse(stored) as SpotifyTokens;
-        // Validate tokens haven't expired completely (refresh token should still work)
-        if (tokens.access_token && tokens.refresh_token) {
+        // Validate tokens have required fields and are not empty
+        if (
+          tokens &&
+          tokens.access_token &&
+          tokens.refresh_token &&
+          typeof tokens.access_token === 'string' &&
+          typeof tokens.refresh_token === 'string' &&
+          tokens.access_token.trim() !== '' &&
+          tokens.refresh_token.trim() !== '' &&
+          tokens.expires_at &&
+          typeof tokens.expires_at === 'number'
+        ) {
           return tokens;
+        } else {
+          // Invalid tokens, remove them
+          console.warn('[Spotify] Invalid tokens in localStorage, removing...');
+          localStorage.removeItem(TOKENS_STORAGE_KEY);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[Spotify] Error loading tokens from localStorage:', err);
       localStorage.removeItem(TOKENS_STORAGE_KEY);
     }
 
@@ -183,14 +198,27 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           .single();
 
         if (!error && data) {
-          const tokens = {
-            access_token: data.access_token,
-            refresh_token: data.refresh_token,
-            expires_at: new Date(data.expires_at).getTime(),
-          } as SpotifyTokens;
-          // Cache to localStorage
-          localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
-          return tokens;
+          // Validate data from Supabase
+          if (
+            data.access_token &&
+            data.refresh_token &&
+            data.expires_at &&
+            typeof data.access_token === 'string' &&
+            typeof data.refresh_token === 'string' &&
+            data.access_token.trim() !== '' &&
+            data.refresh_token.trim() !== ''
+          ) {
+            const tokens = {
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              expires_at: new Date(data.expires_at).getTime(),
+            } as SpotifyTokens;
+            // Cache to localStorage
+            localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
+            return tokens;
+          } else {
+            console.warn('[Spotify] Invalid tokens in Supabase, skipping...');
+          }
         }
       } catch {
         // Supabase table might not exist
@@ -259,28 +287,58 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
 
   // Get valid access token (refresh if needed)
   const getValidToken = useCallback(async (): Promise<string | null> => {
-    if (!tokensRef.current) return null;
+    if (!tokensRef.current) {
+      console.warn('[Spotify] No tokens available');
+      return null;
+    }
 
     // Check if token is expired (with 5 minute buffer)
     if (tokensRef.current.expires_at < Date.now() + 5 * 60 * 1000) {
       try {
+        console.log('[Spotify] Token expired, refreshing...');
         const newTokens = await refreshAccessToken(tokensRef.current.refresh_token);
         tokensRef.current = newTokens;
-        apiRef.current = new SpotifyAPI(newTokens.access_token);
+        
+        // Update existing API instance instead of creating new one
+        if (apiRef.current) {
+          apiRef.current.updateToken(newTokens.access_token);
+        } else {
+          apiRef.current = new SpotifyAPI(newTokens.access_token);
+        }
+        
         await saveTokens(newTokens);
+        console.log('[Spotify] Token refreshed successfully');
       } catch (err) {
-        console.error('Failed to refresh token:', err);
+        console.error('[Spotify] Failed to refresh token:', err);
+        // Clear invalid tokens
+        tokensRef.current = null;
+        apiRef.current = null;
+        await deleteTokens();
+        setState(prev => ({ 
+          ...prev, 
+          isConnected: false, 
+          error: 'Session expired. Please reconnect to Spotify.' 
+        }));
         return null;
       }
     }
 
+    // Validate token exists
+    if (!tokensRef.current.access_token) {
+      console.error('[Spotify] Access token is missing');
+      return null;
+    }
+
     return tokensRef.current.access_token;
-  }, [saveTokens]);
+  }, [saveTokens, deleteTokens]);
 
   // Fetch user profile
   const fetchUser = useCallback(async () => {
     const token = await getValidToken();
-    if (!token || !apiRef.current) return;
+    if (!token || !apiRef.current) {
+      console.warn('[Spotify] Cannot fetch user: no valid token or API instance');
+      return;
+    }
 
     try {
       const user = await apiRef.current.getMe();
@@ -288,16 +346,26 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         ...prev,
         user,
         isPremium: user.product === 'premium',
+        error: null,
       }));
     } catch (err) {
-      console.error('Failed to fetch user:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Spotify] Failed to fetch user:', errorMessage);
+      
+      // If 401, token refresh will be handled by getValidToken on next call
+      if (errorMessage.includes('401')) {
+        tokensRef.current = null; // Force refresh on next call
+      }
     }
   }, [getValidToken]);
 
   // Fetch playback state
   const fetchPlayback = useCallback(async () => {
     const token = await getValidToken();
-    if (!token || !apiRef.current) return;
+    if (!token || !apiRef.current) {
+      console.warn('[Spotify] Cannot fetch playback: no valid token or API instance');
+      return;
+    }
 
     try {
       const playbackState = await apiRef.current.getPlaybackState();
@@ -306,7 +374,13 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         const track = playbackState.item;
         
         // Check if track is liked
-        const [isLiked] = await apiRef.current.checkSavedTracks([track.id]);
+        let isLiked = false;
+        try {
+          const [liked] = await apiRef.current.checkSavedTracks([track.id]);
+          isLiked = liked;
+        } catch (err) {
+          console.warn('[Spotify] Failed to check if track is liked:', err);
+        }
         
         // Get audio features for mood
         let mood = state.mood;
@@ -314,7 +388,10 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           try {
             const features = await apiRef.current.getAudioFeatures(track.id);
             mood = getMoodFromFeatures(features);
-          } catch {
+          } catch (err) {
+            // Audio features might fail due to permissions or track availability
+            // This is not critical, so we just log and continue
+            console.warn('[Spotify] Failed to get audio features:', err);
             mood = null;
           }
           
@@ -322,6 +399,8 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           if (track.album.images[0]) {
             extractDominantColor(track.album.images[0].url).then(color => {
               setState(prev => ({ ...prev, dominantColor: color }));
+            }).catch(() => {
+              // Silently fail - not critical
             });
           }
         }
@@ -351,33 +430,88 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         }));
       }
     } catch (err) {
-      console.error('Failed to fetch playback:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Spotify] Failed to fetch playback:', errorMessage);
+      
+      // If it's a 401, try to refresh token and retry once
+      if (errorMessage.includes('401')) {
+        console.log('[Spotify] 401 error detected, attempting token refresh...');
+        tokensRef.current = null; // Force refresh
+        const newToken = await getValidToken();
+        if (newToken && apiRef.current) {
+          // Retry once after refresh
+          try {
+            const playbackState = await apiRef.current.getPlaybackState();
+            if (playbackState && playbackState.item) {
+              // Successfully retried, update state
+              const track = playbackState.item;
+              setState(prev => ({
+                ...prev,
+                playbackState,
+                currentTrack: track,
+                isPlaying: playbackState.is_playing,
+                progress: playbackState.progress_ms,
+                duration: track.duration_ms,
+                error: null,
+              }));
+              return;
+            }
+          } catch (retryErr) {
+            console.error('[Spotify] Retry after refresh also failed:', retryErr);
+          }
+        }
+      }
+      
+      setState(prev => ({ 
+        ...prev, 
+        error: errorMessage.includes('401') || errorMessage.includes('403') 
+          ? 'Spotify session expired. Please reconnect.' 
+          : null 
+      }));
     }
   }, [getValidToken, state.currentTrack, state.mood]);
 
   // Fetch devices
   const fetchDevices = useCallback(async () => {
     const token = await getValidToken();
-    if (!token || !apiRef.current) return;
+    if (!token || !apiRef.current) {
+      console.warn('[Spotify] Cannot fetch devices: no valid token or API instance');
+      return;
+    }
 
     try {
       const { devices } = await apiRef.current.getDevices();
-      setState(prev => ({ ...prev, devices }));
+      setState(prev => ({ ...prev, devices, error: null }));
     } catch (err) {
-      console.error('Failed to fetch devices:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Spotify] Failed to fetch devices:', errorMessage);
+      
+      // If 401, token refresh will be handled by getValidToken on next call
+      if (errorMessage.includes('401')) {
+        tokensRef.current = null; // Force refresh on next call
+      }
     }
   }, [getValidToken]);
 
   // Fetch recently played
   const fetchRecentlyPlayed = useCallback(async () => {
     const token = await getValidToken();
-    if (!token || !apiRef.current) return;
+    if (!token || !apiRef.current) {
+      console.warn('[Spotify] Cannot fetch recently played: no valid token or API instance');
+      return;
+    }
 
     try {
       const { items } = await apiRef.current.getRecentlyPlayed(10);
-      setState(prev => ({ ...prev, recentTracks: items }));
+      setState(prev => ({ ...prev, recentTracks: items, error: null }));
     } catch (err) {
-      console.error('Failed to fetch recently played:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Spotify] Failed to fetch recently played:', errorMessage);
+      
+      // If 401, token refresh will be handled by getValidToken on next call
+      if (errorMessage.includes('401')) {
+        tokensRef.current = null; // Force refresh on next call
+      }
     }
   }, [getValidToken]);
 
@@ -387,29 +521,67 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
     if (initializingRef.current || initializedRef.current) return;
     initializingRef.current = true;
 
-    setState(prev => ({ ...prev, isLoading: true }));
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
       const tokens = await loadTokens();
-      if (tokens) {
-        tokensRef.current = tokens;
-        apiRef.current = new SpotifyAPI(tokens.access_token);
-
-        const validToken = await getValidToken();
-        if (validToken) {
-          initializedRef.current = true; // Mark as successfully initialized
-          setState(prev => ({ ...prev, isConnected: true }));
-          await fetchUser();
-          await fetchPlayback();
-          await fetchDevices();
-          await fetchRecentlyPlayed();
-        }
+      if (!tokens) {
+        console.log('[Spotify] No tokens found');
+        setState(prev => ({ ...prev, isConnected: false }));
+        return;
       }
+
+      // Validate tokens have required fields
+      if (!tokens.access_token || !tokens.refresh_token) {
+        console.error('[Spotify] Invalid tokens: missing access_token or refresh_token');
+        await deleteTokens();
+        setState(prev => ({ ...prev, isConnected: false, error: 'Invalid tokens. Please reconnect.' }));
+        return;
+      }
+
+      tokensRef.current = tokens;
+      
+      // Create API instance with validation
+      try {
+        apiRef.current = new SpotifyAPI(tokens.access_token);
+      } catch (err) {
+        console.error('[Spotify] Failed to create API instance:', err);
+        await deleteTokens();
+        setState(prev => ({ ...prev, isConnected: false, error: 'Failed to initialize Spotify connection.' }));
+        return;
+      }
+
+      // Ensure token is valid (refresh if needed)
+      const validToken = await getValidToken();
+      if (!validToken) {
+        console.error('[Spotify] Failed to get valid token');
+        setState(prev => ({ ...prev, isConnected: false, error: 'Failed to validate Spotify session.' }));
+        return;
+      }
+
+      // Successfully initialized
+      initializedRef.current = true;
+      setState(prev => ({ ...prev, isConnected: true, error: null }));
+      
+      // Fetch initial data
+      await Promise.allSettled([
+        fetchUser(),
+        fetchPlayback(),
+        fetchDevices(),
+        fetchRecentlyPlayed(),
+      ]);
+    } catch (err) {
+      console.error('[Spotify] Initialization error:', err);
+      setState(prev => ({ 
+        ...prev, 
+        isConnected: false, 
+        error: err instanceof Error ? err.message : 'Failed to initialize Spotify' 
+      }));
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
       initializingRef.current = false;
     }
-  }, [loadTokens, getValidToken, fetchUser, fetchPlayback, fetchDevices, fetchRecentlyPlayed]);
+  }, [loadTokens, getValidToken, fetchUser, fetchPlayback, fetchDevices, fetchRecentlyPlayed, deleteTokens]);
 
   // Initialize on userId change (but not if already initialized)
   useEffect(() => {
