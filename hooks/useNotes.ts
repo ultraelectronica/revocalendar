@@ -3,6 +3,9 @@ import { Note } from '@/types';
 import { loadNotes, saveNotes } from '@/utils/storageUtils';
 import { createClient, DbNote } from '@/lib/supabase';
 
+// Fields to encrypt in notes
+const ENCRYPTED_NOTE_FIELDS: (keyof Note)[] = ['content'];
+
 // Map database note to local Note type
 function mapDbNoteToLocal(dbNote: DbNote): Note {
   return {
@@ -15,17 +18,44 @@ function mapDbNoteToLocal(dbNote: DbNote): Note {
   };
 }
 
+interface EncryptionHelpers {
+  encrypt: (value: string) => Promise<string>;
+  decrypt: (value: string) => Promise<string>;
+  encryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  decryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  isUnlocked: boolean;
+}
+
 interface UseNotesOptions {
   userId?: string | null;
+  encryption?: EncryptionHelpers | null;
 }
 
 export function useNotes(options: UseNotesOptions = {}) {
-  const { userId } = options;
+  const { userId, encryption } = options;
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
+
+  // Encrypt note sensitive fields
+  const encryptNote = useCallback(async (note: Note): Promise<Note> => {
+    if (!encryption?.isUnlocked) return note;
+    return encryption.encryptFields(note, ENCRYPTED_NOTE_FIELDS);
+  }, [encryption]);
+
+  // Decrypt note sensitive fields
+  const decryptNote = useCallback(async (note: Note): Promise<Note> => {
+    if (!encryption?.isUnlocked) return note;
+    return encryption.decryptFields(note, ENCRYPTED_NOTE_FIELDS);
+  }, [encryption]);
+
+  // Decrypt multiple notes
+  const decryptNotes = useCallback(async (notes: Note[]): Promise<Note[]> => {
+    if (!encryption?.isUnlocked) return notes;
+    return Promise.all(notes.map(decryptNote));
+  }, [encryption, decryptNote]);
 
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
@@ -48,22 +78,28 @@ export function useNotes(options: UseNotesOptions = {}) {
     const localNotes = loadNotes();
     
     if (localNotes.length > 0) {
-      const dbNotes = localNotes.map(n => ({
-        id: n.id,
-        user_id: uid,
-        content: n.content,
-        pinned: n.pinned,
-        color: n.color,
-        created_at: n.createdAt,
-        updated_at: n.updatedAt,
-      }));
+      // Encrypt notes before migrating
+      const encryptedNotes = await Promise.all(
+        localNotes.map(async (n) => {
+          const encrypted = await encryptNote(n);
+          return {
+            id: n.id,
+            user_id: uid,
+            content: encrypted.content,
+            pinned: n.pinned,
+            color: n.color,
+            created_at: n.createdAt,
+            updated_at: n.updatedAt,
+          };
+        })
+      );
       
-      await supabase.from('notes').insert(dbNotes);
+      await supabase.from('notes').insert(encryptedNotes);
       console.log(`Migrated ${localNotes.length} notes to Supabase`);
     }
     
     hasMigratedRef.current = true;
-  }, []);
+  }, [encryptNote]);
 
   // Fetch notes from Supabase or localStorage
   useEffect(() => {
@@ -86,7 +122,9 @@ export function useNotes(options: UseNotesOptions = {}) {
           .order('updated_at', { ascending: false });
 
         if (!error && data) {
-          setNotes(data.map(mapDbNoteToLocal));
+          const mappedNotes = data.map(mapDbNoteToLocal);
+          const decryptedNotes = await decryptNotes(mappedNotes);
+          setNotes(decryptedNotes);
         }
 
         // Set up real-time subscription
@@ -100,16 +138,16 @@ export function useNotes(options: UseNotesOptions = {}) {
               table: 'notes',
               filter: `user_id=eq.${userId}`,
             },
-            (payload) => {
+            async (payload) => {
               if (payload.eventType === 'INSERT') {
-                setNotes(prev => [mapDbNoteToLocal(payload.new as DbNote), ...prev]);
+                const mapped = mapDbNoteToLocal(payload.new as DbNote);
+                const decrypted = await decryptNote(mapped);
+                setNotes(prev => [decrypted, ...prev]);
               } else if (payload.eventType === 'UPDATE') {
+                const mapped = mapDbNoteToLocal(payload.new as DbNote);
+                const decrypted = await decryptNote(mapped);
                 setNotes(prev =>
-                  prev.map(n =>
-                    n.id === (payload.new as DbNote).id
-                      ? mapDbNoteToLocal(payload.new as DbNote)
-                      : n
-                  )
+                  prev.map(n => n.id === decrypted.id ? decrypted : n)
                 );
               } else if (payload.eventType === 'DELETE') {
                 setNotes(prev => prev.filter(n => n.id !== (payload.old as DbNote).id));
@@ -132,7 +170,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, migrateLocalToSupabase]);
+  }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote]);
 
   const addNote = useCallback(async (content: string, color: string | null = null) => {
     const supabase = supabaseRef.current;
@@ -150,12 +188,16 @@ export function useNotes(options: UseNotesOptions = {}) {
 
     if (userId) {
       setSyncing(true);
+      
+      // Encrypt before saving
+      const encryptedNote = await encryptNote(newNote);
+      
       const { data, error } = await supabase
         .from('notes')
         .insert({
           id,
           user_id: userId,
-          content,
+          content: encryptedNote.content,
           pinned: false,
           color,
         })
@@ -163,17 +205,18 @@ export function useNotes(options: UseNotesOptions = {}) {
         .single();
 
       if (!error && data) {
-        setNotes(prev => [mapDbNoteToLocal(data), ...prev]);
+        // Add the original (unencrypted) note to local state
+        setNotes(prev => [newNote, ...prev]);
       }
       setSyncing(false);
-      return data ? mapDbNoteToLocal(data) : newNote;
+      return newNote;
     } else {
       const updatedNotes = [newNote, ...notes];
       setNotes(updatedNotes);
       saveNotes(updatedNotes);
       return newNote;
     }
-  }, [userId, notes]);
+  }, [userId, notes, encryptNote]);
 
   const updateNote = useCallback(async (noteId: string, content: string) => {
     const supabase = supabaseRef.current;
@@ -181,16 +224,23 @@ export function useNotes(options: UseNotesOptions = {}) {
 
     if (userId) {
       setSyncing(true);
+      
+      // Encrypt content before saving
+      const encryptedContent = encryption?.isUnlocked 
+        ? await encryption.encrypt(content)
+        : content;
+      
       const { error } = await supabase
         .from('notes')
         .update({
-          content,
+          content: encryptedContent,
           updated_at: now,
         })
         .eq('id', noteId)
         .eq('user_id', userId);
 
       if (!error) {
+        // Update with original (unencrypted) content
         setNotes(prev =>
           prev.map(note =>
             note.id === noteId
@@ -209,7 +259,7 @@ export function useNotes(options: UseNotesOptions = {}) {
       setNotes(updatedNotes);
       saveNotes(updatedNotes);
     }
-  }, [userId, notes]);
+  }, [userId, notes, encryption]);
 
   const deleteNote = useCallback(async (noteId: string) => {
     const supabase = supabaseRef.current;

@@ -4,6 +4,9 @@ import { loadEvents, saveEvents } from '@/utils/storageUtils';
 import { parseDateString, getDaysUntil } from '@/utils/dateUtils';
 import { createClient, DbEvent } from '@/lib/supabase';
 
+// Fields to encrypt in events
+const ENCRYPTED_EVENT_FIELDS: (keyof CalendarEvent)[] = ['title', 'description'];
+
 // Map database event to local CalendarEvent type
 function mapDbEventToLocal(dbEvent: DbEvent): CalendarEvent {
   return {
@@ -42,18 +45,45 @@ function mapLocalEventToDb(event: Omit<CalendarEvent, 'id'>, userId: string): Om
   };
 }
 
+interface EncryptionHelpers {
+  encrypt: (value: string) => Promise<string>;
+  decrypt: (value: string) => Promise<string>;
+  encryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  decryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  isUnlocked: boolean;
+}
+
 interface UseEventsOptions {
   userId?: string | null;
+  encryption?: EncryptionHelpers | null;
 }
 
 export function useEvents(options: UseEventsOptions = {}) {
-  const { userId } = options;
+  const { userId, encryption } = options;
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
+
+  // Encrypt event sensitive fields
+  const encryptEvent = useCallback(async (event: CalendarEvent): Promise<CalendarEvent> => {
+    if (!encryption?.isUnlocked) return event;
+    return encryption.encryptFields(event, ENCRYPTED_EVENT_FIELDS);
+  }, [encryption]);
+
+  // Decrypt event sensitive fields
+  const decryptEvent = useCallback(async (event: CalendarEvent): Promise<CalendarEvent> => {
+    if (!encryption?.isUnlocked) return event;
+    return encryption.decryptFields(event, ENCRYPTED_EVENT_FIELDS);
+  }, [encryption]);
+
+  // Decrypt multiple events
+  const decryptEvents = useCallback(async (events: CalendarEvent[]): Promise<CalendarEvent[]> => {
+    if (!encryption?.isUnlocked) return events;
+    return Promise.all(events.map(decryptEvent));
+  }, [encryption, decryptEvent]);
 
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
@@ -76,17 +106,23 @@ export function useEvents(options: UseEventsOptions = {}) {
     const localEvents = loadEvents();
     
     if (localEvents.length > 0) {
-      const dbEvents = localEvents.map(e => ({
-        ...mapLocalEventToDb(e, uid),
-        id: e.id,
-      }));
+      // Encrypt events before migrating
+      const encryptedEvents = await Promise.all(
+        localEvents.map(async (e) => {
+          const encrypted = await encryptEvent(e);
+          return {
+            ...mapLocalEventToDb(encrypted, uid),
+            id: e.id,
+          };
+        })
+      );
       
-      await supabase.from('events').insert(dbEvents);
+      await supabase.from('events').insert(encryptedEvents);
       console.log(`Migrated ${localEvents.length} events to Supabase`);
     }
     
     hasMigratedRef.current = true;
-  }, []);
+  }, [encryptEvent]);
 
   // Fetch events from Supabase or localStorage
   useEffect(() => {
@@ -108,7 +144,9 @@ export function useEvents(options: UseEventsOptions = {}) {
           .order('date', { ascending: true });
 
         if (!error && data) {
-          setEvents(data.map(mapDbEventToLocal));
+          const mappedEvents = data.map(mapDbEventToLocal);
+          const decryptedEvents = await decryptEvents(mappedEvents);
+          setEvents(decryptedEvents);
         }
 
         // Set up real-time subscription
@@ -122,16 +160,16 @@ export function useEvents(options: UseEventsOptions = {}) {
               table: 'events',
               filter: `user_id=eq.${userId}`,
             },
-            (payload) => {
+            async (payload) => {
               if (payload.eventType === 'INSERT') {
-                setEvents(prev => [...prev, mapDbEventToLocal(payload.new as DbEvent)]);
+                const mapped = mapDbEventToLocal(payload.new as DbEvent);
+                const decrypted = await decryptEvent(mapped);
+                setEvents(prev => [...prev, decrypted]);
               } else if (payload.eventType === 'UPDATE') {
+                const mapped = mapDbEventToLocal(payload.new as DbEvent);
+                const decrypted = await decryptEvent(mapped);
                 setEvents(prev =>
-                  prev.map(e =>
-                    e.id === (payload.new as DbEvent).id
-                      ? mapDbEventToLocal(payload.new as DbEvent)
-                      : e
-                  )
+                  prev.map(e => e.id === decrypted.id ? decrypted : e)
                 );
               } else if (payload.eventType === 'DELETE') {
                 setEvents(prev => prev.filter(e => e.id !== (payload.old as DbEvent).id));
@@ -154,25 +192,29 @@ export function useEvents(options: UseEventsOptions = {}) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, migrateLocalToSupabase]);
+  }, [userId, migrateLocalToSupabase, decryptEvents, decryptEvent]);
 
   const addEvent = useCallback(async (event: CalendarEvent) => {
     const supabase = supabaseRef.current;
 
     if (userId) {
       setSyncing(true);
+      
+      // Encrypt before saving
+      const encryptedEvent = await encryptEvent(event);
+      
       const { data, error } = await supabase
         .from('events')
         .insert({
-          ...mapLocalEventToDb(event, userId),
+          ...mapLocalEventToDb(encryptedEvent, userId),
           id: event.id,
         })
         .select()
         .single();
 
       if (!error && data) {
-        // Real-time will handle the update, but we can optimistically add
-        setEvents(prev => [...prev, mapDbEventToLocal(data)]);
+        // Add the original (unencrypted) event to local state
+        setEvents(prev => [...prev, event]);
       }
       setSyncing(false);
     } else {
@@ -183,35 +225,39 @@ export function useEvents(options: UseEventsOptions = {}) {
         return newEvents;
       });
     }
-  }, [userId]);
+  }, [userId, encryptEvent]);
 
   const updateEvent = useCallback(async (eventId: string, updatedEvent: CalendarEvent) => {
     const supabase = supabaseRef.current;
 
     if (userId) {
       setSyncing(true);
+      
+      // Encrypt before saving
+      const encryptedEvent = await encryptEvent(updatedEvent);
+      
       const { error } = await supabase
         .from('events')
         .update({
-          date: updatedEvent.date,
-          title: updatedEvent.title,
-          time: updatedEvent.time,
-          end_time: updatedEvent.endTime,
-          description: updatedEvent.description,
-          color: updatedEvent.color,
-          category: updatedEvent.category,
-          is_recurring: updatedEvent.isRecurring,
-          recurrence_pattern: updatedEvent.recurrencePattern,
-          priority: updatedEvent.priority,
-          completed: updatedEvent.completed,
-          reminder: updatedEvent.reminder,
+          date: encryptedEvent.date,
+          title: encryptedEvent.title,
+          time: encryptedEvent.time,
+          end_time: encryptedEvent.endTime,
+          description: encryptedEvent.description,
+          color: encryptedEvent.color,
+          category: encryptedEvent.category,
+          is_recurring: encryptedEvent.isRecurring,
+          recurrence_pattern: encryptedEvent.recurrencePattern,
+          priority: encryptedEvent.priority,
+          completed: encryptedEvent.completed,
+          reminder: encryptedEvent.reminder,
           updated_at: new Date().toISOString(),
         })
         .eq('id', eventId)
         .eq('user_id', userId);
 
       if (!error) {
-        // Optimistic update
+        // Update with original (unencrypted) event
         setEvents(prev => prev.map(e => e.id === eventId ? updatedEvent : e));
       }
       setSyncing(false);
@@ -222,7 +268,7 @@ export function useEvents(options: UseEventsOptions = {}) {
         return newEvents;
       });
     }
-  }, [userId]);
+  }, [userId, encryptEvent]);
 
   const deleteEvent = useCallback(async (eventId: string) => {
     const supabase = supabaseRef.current;

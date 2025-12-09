@@ -11,7 +11,9 @@ import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
 import FocusTimer from '@/components/FocusTimer';
 import AuthModal from '@/components/AuthModal';
+import EncryptionModal from '@/components/EncryptionModal';
 import { useAuth } from '@/hooks/useAuth';
+import { useEncryption } from '@/hooks/useEncryption';
 import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
 import { CalendarEvent } from '@/types';
@@ -47,6 +49,7 @@ function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
 // User Menu Component
 function UserMenu() {
   const { user, profile, isAuthenticated, loading, signOut } = useAuth();
+  const { isSetup, isUnlocked, lockEncryption } = useEncryption();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -107,11 +110,44 @@ function UserMenu() {
               <p className="text-xs text-white/40 truncate">{user?.email}</p>
             </div>
 
+            {/* Encryption Status */}
+            {isSetup && (
+              <div className="px-3 py-2 flex items-center gap-2 text-xs">
+                {isUnlocked ? (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-emerald-400">Encrypted & Unlocked</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="text-amber-400">Encrypted (Locked)</span>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Sync Status */}
             <div className="px-3 py-2 flex items-center gap-2 text-xs text-white/50">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               Synced to cloud
             </div>
+
+            {/* Lock Encryption Button */}
+            {isSetup && isUnlocked && (
+              <button
+                onClick={() => {
+                  lockEncryption();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5 rounded-lg transition-all flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Lock Encryption
+              </button>
+            )}
 
             {/* Sign Out Button */}
             <button
@@ -141,12 +177,37 @@ export default function Home() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [sidebarTab, setSidebarTab] = useState<'plans' | 'notes'>('plans');
   const [showMobileStats, setShowMobileStats] = useState(false);
+  const [showEncryptionModal, setShowEncryptionModal] = useState(false);
 
   // Auth hook
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
 
-  // Pass userId to hooks for Supabase sync
+  // Encryption hook
+  const encryption = useEncryption();
+  const { 
+    isSetup: encryptionSetup, 
+    isUnlocked: encryptionUnlocked, 
+    isLoading: encryptionLoading,
+    encrypt,
+    decrypt,
+    encryptFields,
+    decryptFields,
+  } = encryption;
+
+  // Create encryption helpers object to pass to hooks
+  const encryptionHelpers = useMemo(() => {
+    if (!isAuthenticated) return null;
+    return {
+      encrypt,
+      decrypt,
+      encryptFields,
+      decryptFields,
+      isUnlocked: encryptionUnlocked,
+    };
+  }, [isAuthenticated, encrypt, decrypt, encryptFields, decryptFields, encryptionUnlocked]);
+
+  // Pass userId and encryption to hooks for Supabase sync
   const { 
     events, 
     groupedUpcomingEvents,
@@ -160,7 +221,7 @@ export default function Home() {
     getEventsForDate,
     loading: eventsLoading,
     syncing: eventsSyncing,
-  } = useEvents({ userId });
+  } = useEvents({ userId, encryption: encryptionHelpers });
   
   const { 
     notes, 
@@ -170,10 +231,20 @@ export default function Home() {
     togglePinNote,
     loading: notesLoading,
     syncing: notesSyncing,
-  } = useNotes({ userId });
+  } = useNotes({ userId, encryption: encryptionHelpers });
 
   const isSyncing = eventsSyncing || notesSyncing;
-  const isLoading = authLoading || eventsLoading || notesLoading;
+  const isLoading = authLoading || eventsLoading || notesLoading || encryptionLoading;
+
+  // Show encryption modal when authenticated but encryption needs setup or unlock
+  useEffect(() => {
+    if (isAuthenticated && !encryptionLoading) {
+      // If encryption is set up but not unlocked, show unlock modal
+      if (encryptionSetup && !encryptionUnlocked) {
+        setShowEncryptionModal(true);
+      }
+    }
+  }, [isAuthenticated, encryptionSetup, encryptionUnlocked, encryptionLoading]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -304,6 +375,30 @@ export default function Home() {
 
             {/* Quick Actions */}
             <div className="flex items-center gap-2">
+              {/* Encryption Status Indicator */}
+              {isAuthenticated && encryptionSetup && (
+                <button
+                  onClick={() => !encryptionUnlocked && setShowEncryptionModal(true)}
+                  className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                    encryptionUnlocked
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      : 'bg-amber-500/10 border-amber-500/20 text-amber-400 cursor-pointer hover:bg-amber-500/20'
+                  }`}
+                  title={encryptionUnlocked ? 'Data encrypted & unlocked' : 'Click to unlock encryption'}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {encryptionUnlocked ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    )}
+                  </svg>
+                  <span className="text-[10px] font-medium">
+                    {encryptionUnlocked ? 'Encrypted' : 'Locked'}
+                  </span>
+                </button>
+              )}
+
               {/* Sync Indicator */}
               {isSyncing && (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
@@ -533,6 +628,13 @@ export default function Home() {
         onSave={handleSaveEvent}
         selectedDate={selectedDate}
         editingEvent={editingEvent}
+      />
+
+      {/* Encryption Modal */}
+      <EncryptionModal
+        isOpen={showEncryptionModal}
+        onClose={() => setShowEncryptionModal(false)}
+        onSuccess={() => setShowEncryptionModal(false)}
       />
     </div>
   );

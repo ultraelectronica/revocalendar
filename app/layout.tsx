@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import AuthProvider from '@/components/AuthProvider'
+import EncryptionProvider from '@/components/EncryptionProvider'
 
 export const metadata: Metadata = {
   title: 'Revo | Plan • Track • Achieve',
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-[#0a0a12] min-h-screen antialiased">
         <AuthProvider>
-          {children}
+          <EncryptionProvider>
+            {children}
+          </EncryptionProvider>
         </AuthProvider>
       </body>
     </html>
