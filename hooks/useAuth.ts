@@ -215,16 +215,73 @@ export function useAuthProvider() {
 
   // Sign in with Google OAuth
   const signInWithGoogle = useCallback(async () => {
+    // Get the correct redirect URI based on environment
+    const getRedirectUri = (): string => {
+      // Helper to get production URL from env vars (checks both NEXT_PUBLIC_SITE_URL and SITE_URL)
+      const getProdUrl = (): string | undefined => {
+        return process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+      };
+      
+      // In browser, use current origin
+      if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
+        const hostname = window.location.hostname;
+        
+        // Check if we're in local development
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+        
+        if (isLocalhost) {
+          // In local development, use localhost
+          return `${origin}/auth/callback`;
+        }
+        
+        // In production, use the current origin (should be production URL)
+        // But also check for explicit production URL in env vars
+        const prodUrl = getProdUrl();
+        if (prodUrl) {
+          const prodOrigin = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
+          // Only use env var if it's different from current origin (for edge cases)
+          if (prodOrigin !== origin) {
+            console.log('[Auth] Using production URL from env:', prodOrigin);
+            return `${prodOrigin}/auth/callback`;
+          }
+        }
+        
+        // Use current origin (should be production in production)
+        return `${origin}/auth/callback`;
+      }
+      
+      // Server-side fallback - use production URL from env
+      const prodUrl = getProdUrl();
+      if (prodUrl) {
+        const prodOrigin = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
+        return `${prodOrigin}/auth/callback`;
+      }
+      
+      // Last resort fallback (shouldn't happen in production)
+      return '/auth/callback';
+    };
+
+    const redirectTo = getRedirectUri();
+    
+    console.log('[Auth] Google OAuth redirect URI:', redirectTo);
+    console.log('[Auth] Current origin:', typeof window !== 'undefined' ? window.location.origin : 'server-side');
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
         },
       },
     });
+    
+    if (error) {
+      console.error('[Auth] Google OAuth error:', error);
+    }
+    
     return { error };
   }, [supabase]);
 
