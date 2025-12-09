@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from 'react';
+import { useEffect, useRef, memo, useMemo } from 'react';
 import {
   Scene,
   OrthographicCamera,
@@ -10,6 +10,84 @@ import {
   Vector2,
   Clock
 } from 'three';
+
+// Performance tier detection
+type PerformanceTier = 'high' | 'medium' | 'low';
+
+interface PerformanceConfig {
+  pixelRatioMax: number;
+  lineCountMultiplier: number;
+  enableInteractive: boolean;
+  enableParallax: boolean;
+  animationSpeedMultiplier: number;
+}
+
+const PERFORMANCE_CONFIGS: Record<PerformanceTier, PerformanceConfig> = {
+  high: {
+    pixelRatioMax: 2,
+    lineCountMultiplier: 1,
+    enableInteractive: true,
+    enableParallax: true,
+    animationSpeedMultiplier: 1,
+  },
+  medium: {
+    pixelRatioMax: 1.5,
+    lineCountMultiplier: 0.7,
+    enableInteractive: true,
+    enableParallax: false,
+    animationSpeedMultiplier: 0.9,
+  },
+  low: {
+    pixelRatioMax: 1,
+    lineCountMultiplier: 0.4,
+    enableInteractive: false,
+    enableParallax: false,
+    animationSpeedMultiplier: 0.7,
+  },
+};
+
+function detectPerformanceTier(): PerformanceTier {
+  // Check for reduced motion preference first
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    return 'low';
+  }
+
+  let score = 0;
+
+  // Hardware concurrency (CPU cores)
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2;
+  if (cores >= 8) score += 3;
+  else if (cores >= 4) score += 2;
+  else if (cores >= 2) score += 1;
+
+  // Device memory (in GB) - only available in some browsers
+  const memory = typeof navigator !== 'undefined' ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
+  if (memory !== undefined) {
+    if (memory >= 8) score += 3;
+    else if (memory >= 4) score += 2;
+    else if (memory >= 2) score += 1;
+  } else {
+    // Assume medium if not available
+    score += 1.5;
+  }
+
+  // Screen size - smaller screens often mean mobile/lower-end
+  if (typeof window !== 'undefined') {
+    const screenArea = window.screen.width * window.screen.height;
+    if (screenArea >= 2073600) score += 2; // 1920x1080 or higher
+    else if (screenArea >= 921600) score += 1; // 1280x720 or higher
+    // Smaller gets 0
+
+    // Mobile detection via touch and screen
+    const isMobile = 'ontouchstart' in window && window.screen.width < 768;
+    if (isMobile) score -= 2;
+  }
+
+  // Determine tier based on score
+  if (score >= 6) return 'high';
+  if (score >= 3) return 'medium';
+  return 'low';
+}
 
 const vertexShader = `
 precision highp float;
@@ -225,6 +303,8 @@ type FloatingLinesProps = {
   parallax?: boolean;
   parallaxStrength?: number;
   mixBlendMode?: React.CSSProperties['mixBlendMode'];
+  /** Force a specific performance tier (for testing or manual override) */
+  performanceTier?: PerformanceTier;
 };
 
 function hexToVec3(hex: string): Vector3 {
@@ -266,7 +346,8 @@ function FloatingLines({
   mouseDamping = 0.05,
   parallax = true,
   parallaxStrength = 0.2,
-  mixBlendMode = 'screen'
+  mixBlendMode = 'screen',
+  performanceTier: forcedTier
 }: FloatingLinesProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const targetMouseRef = useRef<Vector2>(new Vector2(-1000, -1000));
@@ -276,11 +357,27 @@ function FloatingLines({
   const targetParallaxRef = useRef<Vector2>(new Vector2(0, 0));
   const currentParallaxRef = useRef<Vector2>(new Vector2(0, 0));
 
+  // Detect performance tier once on mount
+  const performanceTier = useMemo(() => forcedTier ?? detectPerformanceTier(), [forcedTier]);
+  const perfConfig = PERFORMANCE_CONFIGS[performanceTier];
+
+  // Apply performance scaling to settings
+  const effectiveInteractive = interactive && perfConfig.enableInteractive;
+  const effectiveParallax = parallax && perfConfig.enableParallax;
+  const effectiveAnimationSpeed = animationSpeed * perfConfig.animationSpeedMultiplier;
+
   const getLineCount = (waveType: 'top' | 'middle' | 'bottom'): number => {
-    if (typeof lineCount === 'number') return lineCount;
-    if (!enabledWaves.includes(waveType)) return 0;
-    const index = enabledWaves.indexOf(waveType);
-    return lineCount[index] ?? 6;
+    let count: number;
+    if (typeof lineCount === 'number') {
+      count = lineCount;
+    } else if (!enabledWaves.includes(waveType)) {
+      return 0;
+    } else {
+      const index = enabledWaves.indexOf(waveType);
+      count = lineCount[index] ?? 6;
+    }
+    // Apply performance multiplier and ensure at least 1 line
+    return Math.max(1, Math.round(count * perfConfig.lineCountMultiplier));
   };
 
   const getLineDistance = (waveType: 'top' | 'middle' | 'bottom'): number => {
@@ -306,8 +403,16 @@ function FloatingLines({
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
 
-    const renderer = new WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // Apply performance-based pixel ratio limit
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const effectivePixelRatio = Math.min(devicePixelRatio, perfConfig.pixelRatioMax);
+
+    const renderer = new WebGLRenderer({ 
+      antialias: effectivePixelRatio > 1, // Disable antialiasing on low-end
+      alpha: false,
+      powerPreference: performanceTier === 'low' ? 'low-power' : 'high-performance'
+    });
+    renderer.setPixelRatio(effectivePixelRatio);
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     containerRef.current.appendChild(renderer.domElement);
@@ -315,7 +420,7 @@ function FloatingLines({
     const uniforms = {
       iTime: { value: 0 },
       iResolution: { value: new Vector3(1, 1, 1) },
-      animationSpeed: { value: animationSpeed },
+      animationSpeed: { value: effectiveAnimationSpeed },
 
       enableTop: { value: enabledWaves.includes('top') },
       enableMiddle: { value: enabledWaves.includes('middle') },
@@ -348,12 +453,12 @@ function FloatingLines({
       },
 
       iMouse: { value: new Vector2(-1000, -1000) },
-      interactive: { value: interactive },
+      interactive: { value: effectiveInteractive },
       bendRadius: { value: bendRadius },
       bendStrength: { value: bendStrength },
       bendInfluence: { value: 0 },
 
-      parallax: { value: parallax },
+      parallax: { value: effectiveParallax },
       parallaxStrength: { value: parallaxStrength },
       parallaxOffset: { value: new Vector2(0, 0) },
 
@@ -414,7 +519,7 @@ function FloatingLines({
       targetMouseRef.current.set(x * dpr, (rect.height - y) * dpr);
       targetInfluenceRef.current = 1.0;
 
-      if (parallax) {
+      if (effectiveParallax) {
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
         const offsetX = (x - centerX) / rect.width;
@@ -427,7 +532,7 @@ function FloatingLines({
       targetInfluenceRef.current = 0.0;
     };
 
-    if (interactive) {
+    if (effectiveInteractive) {
       renderer.domElement.addEventListener('pointermove', handlePointerMove);
       renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
     }
@@ -436,7 +541,7 @@ function FloatingLines({
     const renderLoop = () => {
       uniforms.iTime.value = clock.getElapsedTime();
 
-      if (interactive) {
+      if (effectiveInteractive) {
         currentMouseRef.current.lerp(targetMouseRef.current, mouseDamping);
         uniforms.iMouse.value.copy(currentMouseRef.current);
 
@@ -444,7 +549,7 @@ function FloatingLines({
         uniforms.bendInfluence.value = currentInfluenceRef.current;
       }
 
-      if (parallax) {
+      if (effectiveParallax) {
         currentParallaxRef.current.lerp(targetParallaxRef.current, mouseDamping);
         uniforms.parallaxOffset.value.copy(currentParallaxRef.current);
       }
@@ -460,7 +565,7 @@ function FloatingLines({
         ro.disconnect();
       }
 
-      if (interactive) {
+      if (effectiveInteractive) {
         renderer.domElement.removeEventListener('pointermove', handlePointerMove);
         renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
       }
@@ -480,13 +585,21 @@ function FloatingLines({
     topWavePosition,
     middleWavePosition,
     bottomWavePosition,
-    animationSpeed,
-    interactive,
+    effectiveAnimationSpeed,
+    effectiveInteractive,
     bendRadius,
     bendStrength,
     mouseDamping,
-    parallax,
-    parallaxStrength
+    effectiveParallax,
+    parallaxStrength,
+    perfConfig,
+    performanceTier,
+    topLineCount,
+    middleLineCount,
+    bottomLineCount,
+    topLineDistance,
+    middleLineDistance,
+    bottomLineDistance
   ]);
 
   return (
