@@ -8,16 +8,27 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/';
 
   // Get the correct base URL for redirects
-  // Always use the request origin (which should be the actual URL the user is on)
+  // Use NEXT_PUBLIC_SITE_URL in production to ensure consistent redirects
   const getBaseUrl = (): string => {
     const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
     
-    // If we're on localhost, use it
+    // If we're on localhost, use it for development
     if (isLocalhost) {
       console.log('[Auth Callback] Using localhost origin:', origin);
       return origin;
     }
     
+    // In production, prefer the configured site URL to avoid localhost redirects
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+    if (siteUrl) {
+      const productionUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+      // Remove trailing slash if present
+      const cleanUrl = productionUrl.replace(/\/$/, '');
+      console.log('[Auth Callback] Using production site URL:', cleanUrl);
+      return cleanUrl;
+    }
+    
+    // Fallback to request origin if no site URL configured
     console.log('[Auth Callback] Using production origin:', origin);
     return origin;
   };

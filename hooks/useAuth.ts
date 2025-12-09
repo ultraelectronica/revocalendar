@@ -217,7 +217,7 @@ export function useAuthProvider() {
   const signInWithGoogle = useCallback(async () => {
     // Get the correct redirect URI based on environment
     const getRedirectUri = (): string => {
-      // In browser, always use current origin (which should be production when deployed)
+      // In browser, check if we're in local development
       if (typeof window !== 'undefined') {
         const origin = window.location.origin;
         const hostname = window.location.hostname;
@@ -230,9 +230,16 @@ export function useAuthProvider() {
           return `${origin}/auth/callback`;
         }
         
-        // In production (not localhost), ALWAYS use current origin
-        // This ensures we use the actual production URL the user is on
-        // Don't rely on env vars which might be wrong or missing
+        // In production (not localhost), prefer NEXT_PUBLIC_SITE_URL to ensure consistent redirects
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+        if (siteUrl) {
+          const productionUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+          const cleanUrl = productionUrl.replace(/\/$/, '');
+          console.log('[Auth] Production detected, using configured site URL:', cleanUrl);
+          return `${cleanUrl}/auth/callback`;
+        }
+        
+        // Fallback to current origin if no site URL configured
         console.log('[Auth] Production detected, using current origin:', origin);
         return `${origin}/auth/callback`;
       }
