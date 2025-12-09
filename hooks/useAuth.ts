@@ -14,6 +14,7 @@ interface AuthContextType {
   verifyOtp: (email: string, token: string) => Promise<{ error: AuthError | null }>;
   resendOtp: (email: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<Pick<DbProfile, 'display_name' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
@@ -54,9 +55,12 @@ export function useAuthProvider() {
     return { data, error };
   }, [supabase]);
 
-  // Create profile and settings for a newly verified user
+  // Create profile and settings for a newly verified user or OAuth user
   const createUserRecords = useCallback(async (user: User, displayName?: string) => {
-    const finalDisplayName = displayName || user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
+    // For OAuth users, get name from user metadata
+    const oauthName = user.user_metadata?.full_name || user.user_metadata?.name;
+    const oauthAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+    const finalDisplayName = displayName || oauthName || user.email?.split('@')[0] || 'User';
 
     // Create profile
     const { error: profileError } = await supabase
@@ -65,6 +69,7 @@ export function useAuthProvider() {
         id: user.id,
         email: user.email,
         display_name: finalDisplayName,
+        avatar_url: oauthAvatar || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
@@ -107,7 +112,13 @@ export function useAuthProvider() {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          // Check if profile exists
+          const { data: existingProfile } = await fetchProfile(session.user.id);
+          
+          // If no profile and user is confirmed (OAuth or verified email), create profile
+          if (!existingProfile && session.user.email_confirmed_at) {
+            await createUserRecords(session.user);
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -125,11 +136,12 @@ export function useAuthProvider() {
         setUser(session?.user ?? null);
 
         if (event === 'SIGNED_IN' && session?.user) {
-          // Check if profile exists, if not create it (for verified users)
+          // Check if profile exists, if not create it (for verified users or OAuth)
           const { data: existingProfile } = await fetchProfile(session.user.id);
           
-          if (!existingProfile && session.user.email_confirmed_at) {
-            // User just verified their email - create profile now
+          if (!existingProfile) {
+            // User signed in without profile - create one
+            // This handles both OTP verification and OAuth sign-in
             await createUserRecords(session.user, pendingSignupData.current.displayName);
             pendingSignupData.current = {};
           }
@@ -199,6 +211,21 @@ export function useAuthProvider() {
     return { error };
   }, [supabase]);
 
+  // Sign in with Google OAuth
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    return { error };
+  }, [supabase]);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -241,6 +268,7 @@ export function useAuthProvider() {
     verifyOtp,
     resendOtp,
     signIn,
+    signInWithGoogle,
     signOut,
     resetPassword,
     updateProfile,
