@@ -10,6 +10,8 @@ import NotesSection from '@/components/NotesSection';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
 import FocusTimer from '@/components/FocusTimer';
+import AuthModal from '@/components/AuthModal';
+import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
 import { CalendarEvent } from '@/types';
@@ -42,6 +44,95 @@ function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
   );
 }
 
+// User Menu Component
+function UserMenu() {
+  const { user, profile, isAuthenticated, loading, signOut } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <button
+          onClick={() => setIsAuthModalOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span className="hidden sm:inline">Sign In</span>
+        </button>
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      </>
+    );
+  }
+
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User';
+  const initials = displayName.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/5 transition-all"
+      >
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center text-white text-xs font-semibold">
+          {initials}
+        </div>
+        <span className="hidden sm:block text-sm text-white/70 max-w-[100px] truncate">
+          {displayName}
+        </span>
+        <svg className={`w-4 h-4 text-white/40 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      {isMenuOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsMenuOpen(false)} 
+          />
+          <div className="absolute right-0 top-full mt-2 w-56 glass-card p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* User Info */}
+            <div className="px-3 py-2 border-b border-white/10 mb-2">
+              <p className="text-sm font-medium text-white truncate">{displayName}</p>
+              <p className="text-xs text-white/40 truncate">{user?.email}</p>
+            </div>
+
+            {/* Sync Status */}
+            <div className="px-3 py-2 flex items-center gap-2 text-xs text-white/50">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Synced to cloud
+            </div>
+
+            {/* Sign Out Button */}
+            <button
+              onClick={() => {
+                signOut();
+                setIsMenuOpen(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5 rounded-lg transition-all flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [nav, setNav] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -51,6 +142,11 @@ export default function Home() {
   const [sidebarTab, setSidebarTab] = useState<'plans' | 'notes'>('plans');
   const [showMobileStats, setShowMobileStats] = useState(false);
 
+  // Auth hook
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
+
+  // Pass userId to hooks for Supabase sync
   const { 
     events, 
     groupedUpcomingEvents,
@@ -61,8 +157,10 @@ export default function Home() {
     updateEvent, 
     deleteEvent,
     toggleEventCompletion,
-    getEventsForDate 
-  } = useEvents();
+    getEventsForDate,
+    loading: eventsLoading,
+    syncing: eventsSyncing,
+  } = useEvents({ userId });
   
   const { 
     notes, 
@@ -70,7 +168,12 @@ export default function Home() {
     updateNote,
     deleteNote,
     togglePinNote,
-  } = useNotes();
+    loading: notesLoading,
+    syncing: notesSyncing,
+  } = useNotes({ userId });
+
+  const isSyncing = eventsSyncing || notesSyncing;
+  const isLoading = authLoading || eventsLoading || notesLoading;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -201,6 +304,17 @@ export default function Home() {
 
             {/* Quick Actions */}
             <div className="flex items-center gap-2">
+              {/* Sync Indicator */}
+              {isSyncing && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                  <svg className="w-3.5 h-3.5 text-cyan-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-[10px] text-cyan-400 hidden sm:inline">Syncing</span>
+                </div>
+              )}
+
               {/* Mobile Stats Toggle */}
               <button
                 onClick={() => setShowMobileStats(!showMobileStats)}
@@ -222,6 +336,9 @@ export default function Home() {
                 </svg>
                 <span className="hidden sm:inline">New Event</span>
               </button>
+
+              {/* User Menu */}
+              <UserMenu />
             </div>
           </div>
 
@@ -247,6 +364,16 @@ export default function Home() {
         <div className="lg:hidden px-4">
           <FocusTimer />
         </div>
+
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="fixed inset-0 z-50 bg-[#0a0a12]/80 backdrop-blur-sm flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full border-2 border-cyan-500/30 border-t-cyan-500 animate-spin" />
+              <p className="text-white/50 text-sm">Loading your calendar...</p>
+            </div>
+          </div>
+        )}
 
         {/* Main Layout */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
