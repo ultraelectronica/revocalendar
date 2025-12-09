@@ -222,7 +222,7 @@ export function useAuthProvider() {
         return process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
       };
       
-      // In browser, use current origin
+      // In browser, check environment
       if (typeof window !== 'undefined') {
         const origin = window.location.origin;
         const hostname = window.location.hostname;
@@ -235,19 +235,17 @@ export function useAuthProvider() {
           return `${origin}/auth/callback`;
         }
         
-        // In production, use the current origin (should be production URL)
-        // But also check for explicit production URL in env vars
+        // In production (not localhost), ALWAYS prefer production URL from env vars
+        // This ensures we use the correct domain even if there are any issues
         const prodUrl = getProdUrl();
         if (prodUrl) {
           const prodOrigin = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
-          // Only use env var if it's different from current origin (for edge cases)
-          if (prodOrigin !== origin) {
-            console.log('[Auth] Using production URL from env:', prodOrigin);
-            return `${prodOrigin}/auth/callback`;
-          }
+          console.log('[Auth] Production detected, using URL from env:', prodOrigin);
+          return `${prodOrigin}/auth/callback`;
         }
         
-        // Use current origin (should be production in production)
+        // Fallback to current origin if no env var (shouldn't happen in production)
+        console.warn('[Auth] No production URL in env vars, using current origin:', origin);
         return `${origin}/auth/callback`;
       }
       
