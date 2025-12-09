@@ -80,7 +80,7 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
       return;
     }
 
-    const checkEncryptionSetup = async () => {
+    const checkEncryptionSetup = async (retryCount = 0): Promise<void> => {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
       try {
@@ -91,8 +91,31 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
           .single();
 
         if (error) {
+          // Handle missing column error (migration not run)
           if (isMissingColumnError(error)) {
-            // Encryption columns not present; treat as not set up but don't block app
+            setState(prev => ({
+              ...prev,
+              isSetup: false,
+              isUnlocked: false,
+              isLoading: false,
+              error: null,
+            }));
+            return;
+          }
+
+          // Handle no rows returned (new user, profile not created yet)
+          // PGRST116 is the error code for "no rows returned"
+          if (error.code === 'PGRST116') {
+            // For new OAuth users, the profile might not exist yet
+            // Retry a few times with a delay
+            if (retryCount < 3) {
+              console.log(`[Encryption] Profile not found, retrying in ${(retryCount + 1) * 500}ms... (attempt ${retryCount + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 500));
+              return checkEncryptionSetup(retryCount + 1);
+            }
+            
+            // After retries, treat as not set up (new user without encryption)
+            console.log('[Encryption] Profile not found after retries, treating as new user without encryption');
             setState(prev => ({
               ...prev,
               isSetup: false,
