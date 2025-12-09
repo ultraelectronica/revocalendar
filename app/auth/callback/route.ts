@@ -8,34 +8,17 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/';
 
   // Get the correct base URL for redirects
-  // Prefer production URL from env vars, fallback to request origin
+  // Always use the request origin (which should be the actual URL the user is on)
   const getBaseUrl = (): string => {
-    const prodUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
     const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
     
-    if (prodUrl) {
-      // If we have a production URL configured, use it
-      const baseUrl = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
-      
-      // In production (non-localhost), always use the production URL from env
-      // This ensures we redirect to the correct domain even if Supabase redirects to localhost
-      if (!isLocalhost) {
-        console.log('[Auth Callback] Using production URL from env:', baseUrl);
-        return baseUrl;
-      }
-      
-      // In localhost, check if we should still use prod URL (for testing)
-      // But typically in localhost, we want to use localhost
-      // Only use prod URL if explicitly configured and we're not in local dev
-      const isLocalDev = process.env.NODE_ENV === 'development';
-      if (!isLocalDev) {
-        console.log('[Auth Callback] Not in local dev, using production URL:', baseUrl);
-        return baseUrl;
-      }
+    // If we're on localhost, use it
+    if (isLocalhost) {
+      console.log('[Auth Callback] Using localhost origin:', origin);
+      return origin;
     }
     
-    // Fallback to request origin (works for both local and production)
-    console.log('[Auth Callback] Using request origin:', origin);
+    console.log('[Auth Callback] Using production origin:', origin);
     return origin;
   };
 

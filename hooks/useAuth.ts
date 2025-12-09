@@ -217,12 +217,7 @@ export function useAuthProvider() {
   const signInWithGoogle = useCallback(async () => {
     // Get the correct redirect URI based on environment
     const getRedirectUri = (): string => {
-      // Helper to get production URL from env vars (checks both NEXT_PUBLIC_SITE_URL and SITE_URL)
-      const getProdUrl = (): string | undefined => {
-        return process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
-      };
-      
-      // In browser, check environment
+      // In browser, always use current origin (which should be production when deployed)
       if (typeof window !== 'undefined') {
         const origin = window.location.origin;
         const hostname = window.location.hostname;
@@ -235,22 +230,15 @@ export function useAuthProvider() {
           return `${origin}/auth/callback`;
         }
         
-        // In production (not localhost), ALWAYS prefer production URL from env vars
-        // This ensures we use the correct domain even if there are any issues
-        const prodUrl = getProdUrl();
-        if (prodUrl) {
-          const prodOrigin = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
-          console.log('[Auth] Production detected, using URL from env:', prodOrigin);
-          return `${prodOrigin}/auth/callback`;
-        }
-        
-        // Fallback to current origin if no env var (shouldn't happen in production)
-        console.warn('[Auth] No production URL in env vars, using current origin:', origin);
+        // In production (not localhost), ALWAYS use current origin
+        // This ensures we use the actual production URL the user is on
+        // Don't rely on env vars which might be wrong or missing
+        console.log('[Auth] Production detected, using current origin:', origin);
         return `${origin}/auth/callback`;
       }
       
       // Server-side fallback - use production URL from env
-      const prodUrl = getProdUrl();
+      const prodUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
       if (prodUrl) {
         const prodOrigin = prodUrl.startsWith('http') ? prodUrl : `https://${prodUrl}`;
         return `${prodOrigin}/auth/callback`;
@@ -264,6 +252,7 @@ export function useAuthProvider() {
     
     console.log('[Auth] Google OAuth redirect URI:', redirectTo);
     console.log('[Auth] Current origin:', typeof window !== 'undefined' ? window.location.origin : 'server-side');
+    console.log('[Auth] Current hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server-side');
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
