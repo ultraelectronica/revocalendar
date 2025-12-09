@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A modern, feature-rich calendar application with event management capabilities",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

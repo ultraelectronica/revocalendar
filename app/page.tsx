@@ -10,6 +10,7 @@ import NotesSection from '@/components/NotesSection';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
 import FocusTimer from '@/components/FocusTimer';
+import SpotifyWidget from '@/components/SpotifyWidget';
 import AuthModal from '@/components/AuthModal';
 import EncryptionModal from '@/components/EncryptionModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -557,9 +558,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Mobile Focus Timer */}
-        <div className="lg:hidden px-4">
+        {/* Mobile Focus Timer & Spotify */}
+        <div className="lg:hidden px-4 space-y-4">
           <FocusTimer />
+          <SpotifyWidget />
         </div>
 
         {/* Loading Overlay */}
@@ -575,10 +577,11 @@ export default function Home() {
         {/* Main Layout */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-5">
-            {/* Left Sidebar - Stats & Timer (Desktop only) */}
-            <aside className="w-72 flex-shrink-0 hidden lg:block">
+            {/* Left Sidebar - Stats, Timer & Spotify (Desktop only) */}
+            <aside className="w-72 flex-shrink-0 hidden lg:block space-y-4">
               <QuickStats stats={stats} />
               <FocusTimer />
+              <SpotifyWidget />
             </aside>
 
             {/* Main Calendar */}
