@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A modern, feature-rich calendar application with event management capabilities",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -24,6 +24,9 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.87.1",
     "@types/three": "^0.181.0",
     "add": "^2.0.6",
     "class-variance-authority": "^0.7.1",
