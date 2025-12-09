@@ -373,7 +373,7 @@ function FloatingLines({
     } else if (!enabledWaves.includes(waveType)) {
       return 0;
     } else {
-      const index = enabledWaves.indexOf(waveType);
+    const index = enabledWaves.indexOf(waveType);
       count = lineCount[index] ?? 6;
     }
     // Apply performance multiplier and ensure at least 1 line

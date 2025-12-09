@@ -157,7 +157,7 @@ export function useNotes(options: UseNotesOptions = {}) {
           .subscribe();
       } else {
         // Fallback to localStorage for unauthenticated users
-        setNotes(loadNotes());
+    setNotes(loadNotes());
       }
 
       setLoading(false);
@@ -175,7 +175,7 @@ export function useNotes(options: UseNotesOptions = {}) {
   const addNote = useCallback(async (content: string, color: string | null = null) => {
     const supabase = supabaseRef.current;
     const now = new Date().toISOString();
-    const id = Date.now().toString(36) + Math.random().toString(36).substring(2);
+    const id = crypto.randomUUID();
 
     const newNote: Note = {
       id,
@@ -211,10 +211,10 @@ export function useNotes(options: UseNotesOptions = {}) {
       setSyncing(false);
       return newNote;
     } else {
-      const updatedNotes = [newNote, ...notes];
-      setNotes(updatedNotes);
-      saveNotes(updatedNotes);
-      return newNote;
+    const updatedNotes = [newNote, ...notes];
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+    return newNote;
     }
   }, [userId, notes, encryptNote]);
 
@@ -251,13 +251,13 @@ export function useNotes(options: UseNotesOptions = {}) {
       }
       setSyncing(false);
     } else {
-      const updatedNotes = notes.map(note =>
-        note.id === noteId
+    const updatedNotes = notes.map(note =>
+      note.id === noteId
           ? { ...note, content, updatedAt: now }
-          : note
-      );
-      setNotes(updatedNotes);
-      saveNotes(updatedNotes);
+        : note
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
     }
   }, [userId, notes, encryption]);
 
@@ -277,9 +277,9 @@ export function useNotes(options: UseNotesOptions = {}) {
       }
       setSyncing(false);
     } else {
-      const updatedNotes = notes.filter(note => note.id !== noteId);
-      setNotes(updatedNotes);
-      saveNotes(updatedNotes);
+    const updatedNotes = notes.filter(note => note.id !== noteId);
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
     }
   }, [userId, notes]);
 
@@ -309,9 +309,9 @@ export function useNotes(options: UseNotesOptions = {}) {
     } else {
       const updatedNotes = notes.map(n =>
         n.id === noteId ? { ...n, pinned: newPinned } : n
-      );
-      setNotes(updatedNotes);
-      saveNotes(updatedNotes);
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
     }
   }, [userId, notes]);
 
@@ -335,11 +335,11 @@ export function useNotes(options: UseNotesOptions = {}) {
       }
       setSyncing(false);
     } else {
-      const updatedNotes = notes.map(note =>
+    const updatedNotes = notes.map(note =>
         note.id === noteId ? { ...note, color } : note
-      );
-      setNotes(updatedNotes);
-      saveNotes(updatedNotes);
+    );
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
     }
   }, [userId, notes]);
 

@@ -179,7 +179,7 @@ export function useEvents(options: UseEventsOptions = {}) {
           .subscribe();
       } else {
         // Fallback to localStorage for unauthenticated users
-        setEvents(loadEvents());
+    setEvents(loadEvents());
       }
 
       setLoading(false);
@@ -219,11 +219,11 @@ export function useEvents(options: UseEventsOptions = {}) {
       setSyncing(false);
     } else {
       // localStorage fallback
-      setEvents(prev => {
-        const newEvents = [...prev, event];
-        saveEvents(newEvents);
-        return newEvents;
-      });
+    setEvents(prev => {
+      const newEvents = [...prev, event];
+      saveEvents(newEvents);
+      return newEvents;
+    });
     }
   }, [userId, encryptEvent]);
 
@@ -262,11 +262,11 @@ export function useEvents(options: UseEventsOptions = {}) {
       }
       setSyncing(false);
     } else {
-      setEvents(prev => {
-        const newEvents = prev.map(e => e.id === eventId ? updatedEvent : e);
-        saveEvents(newEvents);
-        return newEvents;
-      });
+    setEvents(prev => {
+      const newEvents = prev.map(e => e.id === eventId ? updatedEvent : e);
+    saveEvents(newEvents);
+      return newEvents;
+    });
     }
   }, [userId, encryptEvent]);
 
@@ -287,11 +287,11 @@ export function useEvents(options: UseEventsOptions = {}) {
       }
       setSyncing(false);
     } else {
-      setEvents(prev => {
-        const newEvents = prev.filter(e => e.id !== eventId);
-        saveEvents(newEvents);
-        return newEvents;
-      });
+    setEvents(prev => {
+      const newEvents = prev.filter(e => e.id !== eventId);
+    saveEvents(newEvents);
+      return newEvents;
+    });
     }
   }, [userId]);
 
@@ -451,7 +451,7 @@ export function useEvents(options: UseEventsOptions = {}) {
     if (event) {
       const newEvent: CalendarEvent = {
         ...event,
-        id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+        id: crypto.randomUUID(),
         title: `${event.title} (copy)`,
         completed: false,
       };
