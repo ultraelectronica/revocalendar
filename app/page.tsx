@@ -243,6 +243,11 @@ export default function Home() {
           </div>
         )}
 
+        {/* Mobile Focus Timer */}
+        <div className="lg:hidden px-4">
+          <FocusTimer />
+        </div>
+
         {/* Main Layout */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-5">
