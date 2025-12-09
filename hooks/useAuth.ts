@@ -10,12 +10,13 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAuthenticated: boolean;
+  signingOut: boolean;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: AuthError | null; needsVerification: boolean }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: AuthError | null }>;
   resendOtp: (email: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<Pick<DbProfile, 'display_name' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
 }
@@ -35,6 +36,7 @@ export function useAuthProvider() {
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Store pending signup data for profile creation after verification
   const pendingSignupData = useRef<{ displayName?: string }>({});
@@ -227,10 +229,45 @@ export function useAuthProvider() {
   }, [supabase]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setProfile(null);
+    setSigningOut(true);
+    
+    try {
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error signing out:', error);
+        setSigningOut(false);
+        return { error: new Error(error.message) };
+      }
+
+      // Clear local state
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      pendingSignupData.current = {};
+
+      // Clear any cached data from localStorage (optional - only if you want to clear local data on sign out)
+      // Note: We're keeping localStorage data in case user wants to continue offline
+      // If you want to clear it, uncomment the following:
+      // try {
+      //   localStorage.removeItem('calendar_events_v2');
+      //   localStorage.removeItem('calendar_notes_v2');
+      //   localStorage.removeItem('calendar_settings');
+      // } catch (e) {
+      //   console.warn('Could not clear localStorage:', e);
+      // }
+
+      // Small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      setSigningOut(false);
+      return { error: null };
+    } catch (err) {
+      console.error('Unexpected error during sign out:', err);
+      setSigningOut(false);
+      return { error: err instanceof Error ? err : new Error('Failed to sign out') };
+    }
   }, [supabase]);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -263,6 +300,7 @@ export function useAuthProvider() {
     profile,
     session,
     loading,
+    signingOut,
     isAuthenticated: !!user,
     signUp,
     verifyOtp,

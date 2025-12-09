@@ -658,13 +658,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             {/* Google Sign In - only show for signin and signup modes */}
             {(mode === 'signin' || mode === 'signup') && (
               <>
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="px-3 bg-[#0f0f1a] text-white/40">or continue with</span>
-                  </div>
+                <div className="my-4 flex justify-center">
+                  <span className="text-xs text-white/40">or continue with</span>
                 </div>
 
                 <button

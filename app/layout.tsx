@@ -26,7 +26,7 @@ export default function RootLayout({
       <body className="bg-[#0a0a12] min-h-screen antialiased">
         <AuthProvider>
           <EncryptionProvider>
-            {children}
+        {children}
           </EncryptionProvider>
         </AuthProvider>
       </body>

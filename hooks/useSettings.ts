@@ -90,7 +90,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
         }
       } else {
         // Fallback to localStorage for unauthenticated users
-        setSettings(loadSettings());
+    setSettings(loadSettings());
       }
 
       setLoading(false);
@@ -108,7 +108,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       
       // Also save to localStorage as fallback
       if (!userId) {
-        saveSettings(updated);
+      saveSettings(updated);
       }
       
       return updated;
@@ -158,7 +158,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       
       setSyncing(false);
     } else {
-      saveSettings(DEFAULT_SETTINGS);
+    saveSettings(DEFAULT_SETTINGS);
     }
   }, [userId]);
 

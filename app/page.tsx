@@ -48,10 +48,12 @@ function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
 
 // User Menu Component
 function UserMenu() {
-  const { user, profile, isAuthenticated, loading, signOut } = useAuth();
+  const { user, profile, isAuthenticated, loading, signingOut, signOut } = useAuth();
   const { isSetup, isUnlocked, lockEncryption } = useEncryption();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -152,16 +154,116 @@ function UserMenu() {
             {/* Sign Out Button */}
             <button
               onClick={() => {
-                signOut();
+                setShowSignOutConfirm(true);
                 setIsMenuOpen(false);
               }}
-              className="w-full px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5 rounded-lg transition-all flex items-center gap-2"
+              disabled={signingOut}
+              className="w-full px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Sign Out
+              {signingOut ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Signing out...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </>
+              )}
             </button>
+          </div>
+        </>
+      )}
+
+      {/* Sign Out Confirmation Dialog */}
+      {showSignOutConfirm && (
+        <>
+          <div 
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              setShowSignOutConfirm(false);
+              setSignOutError(null);
+            }}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="glass-card p-6 max-w-md w-full animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Sign Out</h3>
+                  <p className="text-sm text-white/50">Are you sure you want to sign out?</p>
+                </div>
+              </div>
+
+              {signOutError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {signOutError}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setSignOutError(null);
+                    
+                    try {
+                      // Lock encryption if unlocked
+                      if (isSetup && isUnlocked) {
+                        lockEncryption();
+                      }
+
+                      // Sign out
+                      const { error } = await signOut();
+                      
+                      if (error) {
+                        setSignOutError(error.message || 'Failed to sign out. Please try again.');
+                      } else {
+                        setShowSignOutConfirm(false);
+                        // Optionally refresh the page to ensure clean state
+                        window.location.reload();
+                      }
+                    } catch (err) {
+                      setSignOutError('An unexpected error occurred. Please try again.');
+                      console.error('Sign out error:', err);
+                    }
+                  }}
+                  disabled={signingOut}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {signingOut ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Signing out...
+                    </span>
+                  ) : (
+                    'Sign Out'
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSignOutConfirm(false);
+                    setSignOutError(null);
+                  }}
+                  disabled={signingOut}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </>
       )}
