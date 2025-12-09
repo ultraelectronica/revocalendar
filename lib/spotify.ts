@@ -1,18 +1,29 @@
 // Spotify API configuration and utilities
 
-// Redirect URI must be configured in .env.local and match exactly in Spotify Dashboard
-// For local dev: http://127.0.0.1:3000/auth/spotify/callback
-// For production: https://yourdomain.com/auth/spotify/callback
+// Redirect URI must be configured in env and match Spotify Dashboard entries.
+// - Local dev (loopback): http://127.0.0.1:3000/auth/spotify/callback
+// - Production: https://revocalendar.vercel.app/auth/spotify/callback
 function getSpotifyRedirectUri(): string {
-  const redirectUri = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI || process.env.NEXT_PUBLIC_LOCAL_SPOTIFY_REDIRECT_URI;
-  
-  if (!redirectUri) {
+  const prod = process.env.NEXT_PUBLIC_SPOTIFY_PROD_REDIRECT_URI;
+  const local =
+    process.env.NEXT_PUBLIC_LOCAL_SPOTIFY_REDIRECT_URI ||
+    process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+
+  if (!prod && !local) {
     throw new Error(
-      'Spotify redirect URI is not configured. Please set NEXT_PUBLIC_SPOTIFY_REDIRECT_URI or NEXT_PUBLIC_LOCAL_SPOTIFY_REDIRECT_URI in your .env.local file.'
+      'Spotify redirect URI is not configured. Please set NEXT_PUBLIC_SPOTIFY_PROD_REDIRECT_URI and NEXT_PUBLIC_LOCAL_SPOTIFY_REDIRECT_URI in your env.'
     );
   }
-  
-  return redirectUri;
+
+  // Decide based on runtime host when in the browser
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isLocal = host === '127.0.0.1' || host === 'localhost';
+    return isLocal ? local || prod! : prod || local!;
+  }
+
+  // Fallback for server-side contexts: prefer prod
+  return prod || local!;
 }
 
 export const SPOTIFY_CONFIG = {
