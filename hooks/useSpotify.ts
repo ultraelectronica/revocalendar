@@ -99,6 +99,9 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializingRef = useRef(false); // Prevent concurrent initialization
+  const initializedRef = useRef(false); // Track if we've already initialized successfully
+  const userIdRef = useRef(userId); // Track userId without causing re-renders
+  userIdRef.current = userId;
 
   // Local storage key for tokens (fallback when Supabase table doesn't exist)
   const TOKENS_STORAGE_KEY = 'spotify_tokens';
@@ -123,18 +126,24 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
   }, []);
 
   // Load tokens from localStorage (primary) or Supabase (backup sync)
-  const loadTokens = useCallback(async () => {
+  const loadTokens = useCallback(async (): Promise<SpotifyTokens | null> => {
+    // If we already have valid tokens in ref, use them (avoid repeated reads)
+    if (tokensRef.current?.access_token && tokensRef.current?.refresh_token) {
+      return tokensRef.current;
+    }
+
     // First check for pending tokens from OAuth callback
     const pendingTokens = checkPendingTokens();
     if (pendingTokens) {
       // Try to sync to Supabase in background (don't block on it)
-      if (userId) {
+      const currentUserId = userIdRef.current;
+      if (currentUserId) {
         (async () => {
           try {
             await supabaseRef.current
               .from('spotify_tokens')
               .upsert({
-                user_id: userId,
+                user_id: currentUserId,
                 access_token: pendingTokens.access_token,
                 refresh_token: pendingTokens.refresh_token,
                 expires_at: new Date(pendingTokens.expires_at).toISOString(),
@@ -142,7 +151,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
               }, { onConflict: 'user_id' });
             console.log('[Spotify] Tokens synced to Supabase');
           } catch {
-            console.log('[Spotify] Supabase sync skipped (table may not exist)');
+            // Silently fail
           }
         })();
       }
@@ -156,7 +165,6 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         const tokens = JSON.parse(stored) as SpotifyTokens;
         // Validate tokens haven't expired completely (refresh token should still work)
         if (tokens.access_token && tokens.refresh_token) {
-          console.log('[Spotify] Loaded tokens from localStorage');
           return tokens;
         }
       }
@@ -164,13 +172,14 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
       localStorage.removeItem(TOKENS_STORAGE_KEY);
     }
 
-    // Fallback: try Supabase (only once, don't retry on error)
-    if (userId) {
+    // Fallback: try Supabase once
+    const currentUserId = userIdRef.current;
+    if (currentUserId) {
       try {
         const { data, error } = await supabaseRef.current
           .from('spotify_tokens')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', currentUserId)
           .single();
 
         if (!error && data) {
@@ -184,15 +193,15 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           return tokens;
         }
       } catch {
-        // Supabase table might not exist, that's okay
+        // Supabase table might not exist
       }
     }
 
     return null;
-  }, [userId, checkPendingTokens]);
+  }, [checkPendingTokens]); // Removed userId dependency - using ref instead
 
   // Save tokens to localStorage (primary) and Supabase (background sync)
-  const saveTokens = useCallback(async (tokens: SpotifyTokens) => {
+  const saveTokens = useCallback((tokens: SpotifyTokens) => {
     // Always save to localStorage (primary storage)
     try {
       localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
@@ -201,45 +210,52 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
     }
 
     // Sync to Supabase in background (don't block)
-    if (userId) {
+    const currentUserId = userIdRef.current;
+    if (currentUserId) {
       (async () => {
         try {
           await supabaseRef.current
             .from('spotify_tokens')
             .upsert({
-              user_id: userId,
+              user_id: currentUserId,
               access_token: tokens.access_token,
               refresh_token: tokens.refresh_token,
               expires_at: new Date(tokens.expires_at).toISOString(),
               updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id' });
         } catch {
-          // Silently fail if table doesn't exist
+          // Silently fail
         }
       })();
     }
-  }, [userId]);
+  }, []); // No dependencies - uses refs
 
   // Delete tokens from localStorage and Supabase
-  const deleteTokens = useCallback(async () => {
+  const deleteTokens = useCallback(() => {
     // Clear localStorage
     localStorage.removeItem(TOKENS_STORAGE_KEY);
     localStorage.removeItem(PENDING_TOKENS_KEY);
+    
+    // Clear refs
+    tokensRef.current = null;
+    apiRef.current = null;
+    initializedRef.current = false;
 
     // Clear Supabase (background, don't block)
-    if (userId) {
+    const currentUserId = userIdRef.current;
+    if (currentUserId) {
       (async () => {
         try {
           await supabaseRef.current
             .from('spotify_tokens')
             .delete()
-            .eq('user_id', userId);
+            .eq('user_id', currentUserId);
         } catch {
-          // Silently fail if table doesn't exist
+          // Silently fail
         }
       })();
     }
-  }, [userId]);
+  }, []); // No dependencies - uses refs
 
   // Get valid access token (refresh if needed)
   const getValidToken = useCallback(async (): Promise<string | null> => {
@@ -367,8 +383,8 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
 
   // Initialize Spotify connection
   const initializeSpotify = useCallback(async () => {
-    // Prevent concurrent initialization
-    if (initializingRef.current) return;
+    // Prevent concurrent or repeated initialization
+    if (initializingRef.current || initializedRef.current) return;
     initializingRef.current = true;
 
     setState(prev => ({ ...prev, isLoading: true }));
@@ -381,6 +397,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
 
         const validToken = await getValidToken();
         if (validToken) {
+          initializedRef.current = true; // Mark as successfully initialized
           setState(prev => ({ ...prev, isConnected: true }));
           await fetchUser();
           await fetchPlayback();
@@ -394,22 +411,29 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
     }
   }, [loadTokens, getValidToken, fetchUser, fetchPlayback, fetchDevices, fetchRecentlyPlayed]);
 
-  // Initialize on userId change
+  // Initialize on userId change (but not if already initialized)
   useEffect(() => {
     if (!userId) {
       setState(prev => ({ ...prev, isLoading: false, isConnected: false }));
       return;
     }
 
-    initializeSpotify();
-  }, [userId, initializeSpotify]);
+    // Skip if already initialized
+    if (initializedRef.current) return;
 
-  // Watch for pending tokens (from OAuth callback redirect)
+    initializeSpotify();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]); // Only trigger on userId change, not on initializeSpotify change
+
+  // Watch for pending tokens (from OAuth callback redirect) - runs once on mount
   useEffect(() => {
-    // Check immediately on mount
+    // Check for pending tokens
     const checkPending = () => {
+      // Skip if already initialized
+      if (initializedRef.current) return false;
+      
       const hasPending = localStorage.getItem('spotify_pending_tokens');
-      if (hasPending && !state.isConnected) {
+      if (hasPending) {
         console.log('[Spotify] Detected pending tokens, initializing...');
         initializeSpotify();
         return true;
@@ -423,35 +447,21 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
     // Check again shortly after mount (handles redirect timing)
     const timeout = setTimeout(checkPending, 100);
 
-    // Listen for visibility changes (user returning from Spotify auth tab)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkPending();
-      }
-    };
-
-    // Listen for focus (another way to detect return)
-    const handleFocus = () => checkPending();
-
-    // Also listen for storage events (cross-tab)
+    // Listen for storage events (cross-tab only)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'spotify_pending_tokens' && e.newValue) {
+      if (e.key === 'spotify_pending_tokens' && e.newValue && !initializedRef.current) {
         console.log('[Spotify] Storage event: pending tokens detected');
         initializeSpotify();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleFocus);
     window.addEventListener('storage', handleStorage);
     
     return () => {
       clearTimeout(timeout);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('storage', handleStorage);
     };
-  }, [state.isConnected, initializeSpotify]);
+  }, [initializeSpotify]); // Only depends on initializeSpotify
 
   // Progress timer
   useEffect(() => {

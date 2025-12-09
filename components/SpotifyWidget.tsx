@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSpotify } from '@/hooks/useSpotify';
 import { useAuth } from '@/hooks/useAuth';
 
-// Vinyl record animation component
+// Vinyl record animation component (for mini view)
 function VinylRecord({ 
   albumArt, 
   isPlaying, 
@@ -51,6 +51,441 @@ function VinylRecord({
         className="absolute inset-0 rounded-full opacity-30 blur-2xl -z-10"
         style={{ backgroundColor: dominantColor }}
       />
+    </div>
+  );
+}
+
+// Full-screen vinyl player
+function FullScreenPlayer({
+  track,
+  albumArt,
+  isPlaying,
+  dominantColor,
+  mood,
+  isLiked,
+  progress,
+  duration,
+  shuffle,
+  repeat,
+  onClose,
+  onTogglePlayPause,
+  onNext,
+  onPrevious,
+  onSeek,
+  onToggleShuffle,
+  onCycleRepeat,
+  onToggleLike,
+  formatTime,
+}: {
+  track: {
+    name: string;
+    artists: { name: string; external_urls: { spotify: string } }[];
+    album: { name: string };
+    external_urls: { spotify: string };
+    explicit?: boolean;
+  };
+  albumArt: string;
+  isPlaying: boolean;
+  dominantColor: string;
+  mood: { mood: string; emoji: string; color: string } | null;
+  isLiked: boolean;
+  progress: number;
+  duration: number;
+  shuffle: boolean;
+  repeat: 'off' | 'context' | 'track';
+  onClose: () => void;
+  onTogglePlayPause: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSeek: (position: number) => void;
+  onToggleShuffle: () => void;
+  onCycleRepeat: () => void;
+  onToggleLike: () => void;
+  formatTime: (ms: number) => string;
+}) {
+  const progressRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Trigger entrance animation
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+  }, []);
+
+  // Handle progress bar click/drag
+  const handleProgressClick = (e: React.MouseEvent) => {
+    if (!progressRef.current) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    onSeek(Math.floor(percent * duration));
+  };
+
+  // Close on escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === ' ') {
+        e.preventDefault();
+        onTogglePlayPause();
+      }
+      if (e.key === 'ArrowRight') onNext();
+      if (e.key === 'ArrowLeft') onPrevious();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, onTogglePlayPause, onNext, onPrevious]);
+
+  const percentage = duration > 0 ? (progress / duration) * 100 : 0;
+
+  return (
+    <div className="fixed inset-0 z-[200] overflow-hidden">
+      {/* Backdrop blur - full coverage */}
+      <div 
+        className={`fixed inset-0 backdrop-blur-2xl transition-all duration-300 ${
+          isVisible ? 'bg-black/80' : 'bg-black/0'
+        }`}
+        onClick={onClose}
+      />
+      
+      {/* Gradient overlay */}
+      <div 
+        className={`fixed inset-0 pointer-events-none transition-opacity duration-500 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          background: `linear-gradient(135deg, ${dominantColor}25 0%, transparent 40%, transparent 60%, ${dominantColor}20 100%)`,
+        }}
+      />
+
+      {/* Animated background orbs */}
+      <div 
+        className={`fixed top-1/4 -left-32 w-96 h-96 rounded-full blur-[128px] animate-pulse pointer-events-none transition-opacity duration-700 ${
+          isVisible ? 'opacity-40' : 'opacity-0'
+        }`}
+        style={{ backgroundColor: dominantColor, animationDuration: '4s' }}
+      />
+      <div 
+        className={`fixed bottom-1/4 -right-32 w-96 h-96 rounded-full blur-[128px] animate-pulse pointer-events-none transition-opacity duration-700 ${
+          isVisible ? 'opacity-30' : 'opacity-0'
+        }`}
+        style={{ backgroundColor: dominantColor, animationDuration: '6s' }}
+      />
+
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className={`fixed top-6 right-6 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 z-10 group ${
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+        }`}
+      >
+        <svg className="w-6 h-6 text-white/60 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {/* Main content */}
+      <div className="relative w-full max-w-4xl mx-auto px-6 py-12 flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16 min-h-screen">
+        {/* Vinyl section */}
+        <div 
+          className={`relative w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 shrink-0 transition-all duration-700 ease-out ${
+            isVisible ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 -rotate-180'
+          }`}
+        >
+          {/* Vinyl disc */}
+          <div 
+            className={`absolute inset-0 rounded-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 ${
+              isPlaying ? 'animate-spin' : ''
+            }`}
+            style={{ 
+              animationDuration: '3s',
+              boxShadow: `
+                0 25px 50px -12px rgba(0,0,0,0.5),
+                0 0 100px ${dominantColor}30,
+                inset 0 0 100px rgba(0,0,0,0.5)
+              `,
+            }}
+          >
+            {/* Outer shine ring */}
+            <div className="absolute inset-0 rounded-full border border-white/10" />
+            
+            {/* Grooves - more detailed */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div 
+                key={i}
+                className="absolute rounded-full border border-white/[0.03]"
+                style={{ inset: `${8 + i * 3}%` }}
+              />
+            ))}
+            
+            {/* Reflective groove highlights */}
+            <div 
+              className="absolute inset-[15%] rounded-full"
+              style={{
+                background: `conic-gradient(from 0deg, transparent 0%, ${dominantColor}10 10%, transparent 20%, ${dominantColor}05 40%, transparent 50%, ${dominantColor}10 70%, transparent 80%, ${dominantColor}05 90%, transparent 100%)`,
+              }}
+            />
+
+            {/* Center label (album art) */}
+            <div 
+              className="absolute inset-[28%] rounded-full overflow-hidden shadow-2xl"
+              style={{
+                border: `4px solid ${dominantColor}40`,
+                boxShadow: `0 0 30px ${dominantColor}30`,
+              }}
+            >
+              <img 
+                src={albumArt} 
+                alt="Album art"
+                className="w-full h-full object-cover"
+              />
+              {/* Label overlay gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
+            </div>
+            
+            {/* Center spindle */}
+            <div className="absolute inset-[47%] rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 border border-zinc-600 shadow-inner" />
+          </div>
+          
+          {/* Glow effect */}
+          <div 
+            className="absolute inset-0 rounded-full blur-3xl -z-10 animate-pulse"
+            style={{ 
+              backgroundColor: dominantColor,
+              opacity: isPlaying ? 0.3 : 0.15,
+              animationDuration: '2s',
+            }}
+          />
+
+          {/* Tonearm (optional decorative element) */}
+          <div 
+            className="absolute -right-8 top-4 w-32 h-2 origin-left hidden lg:block"
+            style={{
+              transform: isPlaying ? 'rotate(25deg)' : 'rotate(5deg)',
+              transition: 'transform 0.5s ease-out',
+            }}
+          >
+            <div className="w-full h-full bg-gradient-to-r from-zinc-600 to-zinc-700 rounded-full shadow-lg" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-zinc-500" />
+          </div>
+        </div>
+
+        {/* Info & controls section */}
+        <div 
+          className={`flex-1 w-full max-w-md text-center lg:text-left transition-all duration-500 delay-150 ${
+            isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
+          }`}
+        >
+          {/* Now Playing label */}
+          <div className="flex items-center justify-center lg:justify-start gap-2 mb-4">
+            <div className="flex items-center gap-1.5">
+              {isPlaying && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: dominantColor }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: dominantColor, animationDelay: '0.2s' }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: dominantColor, animationDelay: '0.4s' }} />
+                </>
+              )}
+            </div>
+            <span className="text-xs font-medium tracking-widest uppercase" style={{ color: dominantColor }}>
+              {isPlaying ? 'Now Playing' : 'Paused'}
+            </span>
+          </div>
+
+          {/* Track name */}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 leading-tight">
+            {track.name}
+          </h1>
+
+          {/* Artist */}
+          <p className="text-lg sm:text-xl text-white/60 mb-1">
+            {track.artists.map(a => a.name).join(', ')}
+          </p>
+
+          {/* Album */}
+          <p className="text-sm text-white/40 mb-4">
+            {track.album.name}
+          </p>
+
+          {/* Mood & like */}
+          <div className="flex items-center justify-center lg:justify-start gap-4 mb-8">
+            {mood && (
+              <div 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                style={{ backgroundColor: `${mood.color}20` }}
+              >
+                <span className="text-lg">{mood.emoji}</span>
+                <span className="text-sm font-medium" style={{ color: mood.color }}>
+                  {mood.mood}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={onToggleLike}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${
+                isLiked ? 'bg-[#1DB954]/20' : 'bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <svg 
+                className={`w-5 h-5 ${isLiked ? 'text-[#1DB954]' : 'text-white/60'}`}
+                fill={isLiked ? 'currentColor' : 'none'} 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              <span className={`text-sm ${isLiked ? 'text-[#1DB954]' : 'text-white/60'}`}>
+                {isLiked ? 'Liked' : 'Like'}
+              </span>
+            </button>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mb-6">
+            <div
+              ref={progressRef}
+              onClick={handleProgressClick}
+              className="relative h-2 bg-white/10 rounded-full cursor-pointer group overflow-hidden"
+            >
+              {/* Buffered/progress */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-full transition-all duration-100"
+                style={{ 
+                  width: `${percentage}%`,
+                  backgroundColor: dominantColor,
+                }}
+              />
+              {/* Thumb */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                style={{ 
+                  left: `calc(${percentage}% - 8px)`,
+                  backgroundColor: dominantColor,
+                  boxShadow: `0 0 10px ${dominantColor}`,
+                }}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-white/40">
+              <span>{formatTime(progress)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center justify-center lg:justify-start gap-4">
+            {/* Shuffle */}
+            <button
+              onClick={onToggleShuffle}
+              className={`p-3 rounded-full transition-all ${
+                shuffle ? '' : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+              }`}
+              style={shuffle ? { color: dominantColor, backgroundColor: `${dominantColor}20` } : {}}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+
+            {/* Previous */}
+            <button
+              onClick={onPrevious}
+              className="p-3 rounded-full text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+              </svg>
+            </button>
+
+            {/* Play/Pause */}
+            <button
+              onClick={onTogglePlayPause}
+              className="p-5 rounded-full text-white transition-all hover:scale-105 shadow-2xl"
+              style={{ 
+                backgroundColor: dominantColor,
+                boxShadow: `0 10px 40px ${dominantColor}50`,
+              }}
+            >
+              {isPlaying ? (
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                </svg>
+              ) : (
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              )}
+            </button>
+
+            {/* Next */}
+            <button
+              onClick={onNext}
+              className="p-3 rounded-full text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+              </svg>
+            </button>
+
+            {/* Repeat */}
+            <button
+              onClick={onCycleRepeat}
+              className={`p-3 rounded-full relative transition-all ${
+                repeat !== 'off' ? '' : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+              }`}
+              style={repeat !== 'off' ? { color: dominantColor, backgroundColor: `${dominantColor}20` } : {}}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {repeat === 'track' && (
+                <span 
+                  className="absolute -top-1 -right-1 text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold"
+                  style={{ backgroundColor: dominantColor, color: '#000' }}
+                >
+                  1
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Open in Spotify */}
+          <div className="mt-8 flex justify-center lg:justify-start">
+            <a
+              href={track.external_urls.spotify}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-sm transition-all"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+              </svg>
+              Open in Spotify
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Keyboard hints */}
+      <div 
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 text-xs text-white/30 transition-all duration-500 delay-300 ${
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}
+      >
+        <span className="flex items-center gap-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono">Space</kbd>
+          Play/Pause
+        </span>
+        <span className="flex items-center gap-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono">←</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono">→</kbd>
+          Skip
+        </span>
+        <span className="flex items-center gap-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono">Esc</kbd>
+          Close
+        </span>
+      </div>
     </div>
   );
 }
@@ -329,8 +764,7 @@ function DeviceSelector({
 export default function SpotifyWidget() {
   const { isAuthenticated } = useAuth();
   const spotify = useSpotify();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showRecent, setShowRecent] = useState(false);
+  const [showFullScreen, setShowFullScreen] = useState(false);
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
@@ -430,46 +864,68 @@ export default function SpotifyWidget() {
   const albumArt = track.album.images[0]?.url || track.album.images[1]?.url;
 
   return (
-    <div 
-      className="glass-card overflow-hidden transition-all duration-300"
-      style={{
-        boxShadow: spotify.isPlaying ? `0 0 40px ${spotify.dominantColor}20` : undefined,
-      }}
-    >
-      {/* Expanded view with vinyl */}
-      {isExpanded && (
-        <div className="p-6 pb-4">
-          <div className="max-w-[200px] mx-auto mb-4">
-            <VinylRecord 
-              albumArt={albumArt} 
-              isPlaying={spotify.isPlaying}
-              dominantColor={spotify.dominantColor}
-            />
-          </div>
-        </div>
+    <>
+      {/* Full-screen player */}
+      {showFullScreen && (
+        <FullScreenPlayer
+          track={track}
+          albumArt={albumArt}
+          isPlaying={spotify.isPlaying}
+          dominantColor={spotify.dominantColor}
+          mood={spotify.mood}
+          isLiked={spotify.isLiked}
+          progress={spotify.progress}
+          duration={spotify.duration}
+          shuffle={spotify.shuffle}
+          repeat={spotify.repeat}
+          onClose={() => setShowFullScreen(false)}
+          onTogglePlayPause={spotify.togglePlayPause}
+          onNext={spotify.next}
+          onPrevious={spotify.previous}
+          onSeek={spotify.seek}
+          onToggleShuffle={spotify.toggleShuffle}
+          onCycleRepeat={spotify.cycleRepeat}
+          onToggleLike={spotify.toggleLike}
+          formatTime={spotify.formatTime}
+        />
       )}
 
-      {/* Main content */}
-      <div className="p-4">
-        <div className="flex items-center gap-3">
-          {/* Album art (clickable to expand) */}
-          <button 
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="relative shrink-0 group"
-          >
-            <img
-              src={albumArt}
-              alt={track.album.name}
-              className={`w-14 h-14 rounded-lg object-cover shadow-lg transition-transform ${
-                isExpanded ? 'scale-0 h-0 w-0 opacity-0' : ''
-              }`}
-            />
-            {spotify.isPlaying && !isExpanded && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                <AudioVisualizer isPlaying={true} color={spotify.dominantColor} />
+      <div 
+        className="glass-card overflow-hidden transition-all duration-300"
+        style={{
+          boxShadow: spotify.isPlaying ? `0 0 40px ${spotify.dominantColor}20` : undefined,
+        }}
+      >
+        {/* Main content */}
+        <div className="p-4">
+          <div className="flex items-center gap-3">
+            {/* Album art (clickable to open full-screen) */}
+            <button 
+              onClick={() => setShowFullScreen(true)}
+              className="relative shrink-0 group active:scale-90 transition-transform duration-150"
+            >
+              <img
+                src={albumArt}
+                alt={track.album.name}
+                className="w-14 h-14 rounded-lg object-cover shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95"
+                style={{
+                  boxShadow: spotify.isPlaying ? `0 4px 20px ${spotify.dominantColor}40` : undefined,
+                }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 group-active:bg-black/70">
+                <svg className="w-6 h-6 text-white transition-transform group-active:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
               </div>
-            )}
-          </button>
+              {spotify.isPlaying && (
+                <div 
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center animate-pulse"
+                  style={{ backgroundColor: spotify.dominantColor }}
+                >
+                  <AudioVisualizer isPlaying={true} color="#fff" />
+                </div>
+              )}
+            </button>
 
           {/* Track info */}
           <div className="flex-1 min-w-0">
@@ -620,24 +1076,25 @@ export default function SpotifyWidget() {
         </div>
       </div>
 
-      {/* Disconnect option */}
-      <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg className="w-3 h-3 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-          </svg>
-          <span className="text-[10px] text-white/40">
-            {spotify.user?.display_name}
-          </span>
+        {/* Disconnect option */}
+        <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-3 h-3 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+            </svg>
+            <span className="text-[10px] text-white/40">
+              {spotify.user?.display_name}
+            </span>
+          </div>
+          <button
+            onClick={spotify.disconnect}
+            className="text-[10px] text-white/30 hover:text-red-400 transition-colors"
+          >
+            Disconnect
+          </button>
         </div>
-        <button
-          onClick={spotify.disconnect}
-          className="text-[10px] text-white/30 hover:text-red-400 transition-colors"
-        >
-          Disconnect
-        </button>
       </div>
-    </div>
+    </>
   );
 }
 
