@@ -1,4 +1,5 @@
-import { createServerClient } from '@/lib/supabase-server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -35,16 +36,46 @@ export async function GET(request: Request) {
   const baseUrl = getBaseUrl();
 
   if (code) {
-    // Use the new server client for proper cookie handling
-    const supabase = await createServerClient();
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const cookieStore = await cookies();
     
-    if (!error) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[Auth Callback] Missing Supabase environment variables');
+      return NextResponse.redirect(`${baseUrl}/?error=config_error`);
+    }
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch (error) {
+            // Log but don't throw - cookies might be set in middleware
+            console.warn('[Auth Callback] Could not set cookie:', error);
+          }
+        },
+      },
+    });
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    
+    if (!error && data.session) {
+      console.log('[Auth Callback] Session created for:', data.session.user.email);
       console.log('[Auth Callback] Redirecting to:', `${baseUrl}${next}`);
-      return NextResponse.redirect(`${baseUrl}${next}`);
+      
+      // Create redirect response
+      const redirectResponse = NextResponse.redirect(`${baseUrl}${next}`);
+      
+      return redirectResponse;
     } else {
-      console.error('[Auth Callback] Error exchanging code:', error);
+      console.error('[Auth Callback] Error exchanging code:', error?.message);
     }
   }
 
@@ -52,4 +83,3 @@ export async function GET(request: Request) {
   console.log('[Auth Callback] Redirecting to error page:', `${baseUrl}/?error=auth_callback_error`);
   return NextResponse.redirect(`${baseUrl}/?error=auth_callback_error`);
 }
-
