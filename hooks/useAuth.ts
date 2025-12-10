@@ -105,28 +105,22 @@ export function useAuthProvider() {
     }
   }, [supabase, fetchProfile]);
 
-  // Initialize auth state using onAuthStateChange (more reliable than getSession on refresh)
+  // Initialize auth state using onAuthStateChange with fallback for production
   useEffect(() => {
     let isMounted = true;
     let hasInitialized = false;
-
-    // Set a fallback timeout in case no session event fires
-    const fallbackTimeout = setTimeout(() => {
-      if (!hasInitialized && isMounted) {
-        console.warn('[Auth] Fallback timeout: No session event received, assuming not authenticated');
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-        hasInitialized = true;
-      }
-    }, 5000);
+    let eventFallbackTimeout: NodeJS.Timeout | null = null;
+    let finalFallbackTimeout: NodeJS.Timeout | null = null;
 
     // Helper function to handle initial session setup
-    const handleInitialSession = async (session: Session | null) => {
-      if (hasInitialized) return; // Prevent double initialization
+    const handleInitialSession = async (session: Session | null, source: string) => {
+      if (hasInitialized || !isMounted) return; // Prevent double initialization
       
       hasInitialized = true;
-      clearTimeout(fallbackTimeout);
+      if (eventFallbackTimeout) clearTimeout(eventFallbackTimeout);
+      if (finalFallbackTimeout) clearTimeout(finalFallbackTimeout);
+      
+      console.log(`[Auth] Initializing session from ${source}:`, session?.user?.email ?? 'no user');
       
       setSession(session);
       setUser(session?.user ?? null);
@@ -144,6 +138,53 @@ export function useAuthProvider() {
       setLoading(false);
     };
 
+    // Fallback: If no auth events fire within 2 seconds, try to get session directly
+    // This handles cases where onAuthStateChange doesn't fire in production/edge environments
+    eventFallbackTimeout = setTimeout(async () => {
+      if (hasInitialized || !isMounted) return;
+      
+      console.log('[Auth] No auth events received, trying direct session check...');
+      
+      try {
+        // Use getUser() as it's more reliable and validates the session
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (!isMounted || hasInitialized) return;
+        
+        if (error) {
+          console.log('[Auth] Direct session check error:', error.message);
+          // Not an error if session is missing, just means not logged in
+          if (error.message !== 'Auth session missing!') {
+            console.error('[Auth] Unexpected auth error:', error);
+          }
+          await handleInitialSession(null, 'direct-check-no-session');
+        } else if (user) {
+          console.log('[Auth] Found user via direct check:', user.email);
+          // Get the full session for the user
+          const { data: { session } } = await supabase.auth.getSession();
+          await handleInitialSession(session, 'direct-check');
+        } else {
+          await handleInitialSession(null, 'direct-check-no-user');
+        }
+      } catch (e) {
+        console.error('[Auth] Error in fallback session check:', e);
+        if (!hasInitialized && isMounted) {
+          await handleInitialSession(null, 'fallback-error');
+        }
+      }
+    }, 2000);
+
+    // Final fallback: If still not initialized after 6 seconds, assume not authenticated
+    finalFallbackTimeout = setTimeout(() => {
+      if (!hasInitialized && isMounted) {
+        console.warn('[Auth] Final fallback timeout: assuming not authenticated');
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        hasInitialized = true;
+      }
+    }, 6000);
+
     // Listen for auth changes - this will fire INITIAL_SESSION on mount
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -153,7 +194,7 @@ export function useAuthProvider() {
 
         // Handle INITIAL_SESSION - this fires when the listener is first set up
         if (event === 'INITIAL_SESSION') {
-          await handleInitialSession(session);
+          await handleInitialSession(session, 'INITIAL_SESSION');
           return;
         }
 
@@ -161,8 +202,7 @@ export function useAuthProvider() {
         if (event === 'SIGNED_IN' && session?.user) {
           // If we haven't initialized yet, treat this as our initial session
           if (!hasInitialized) {
-            console.log('[Auth] Using SIGNED_IN as initial session');
-            await handleInitialSession(session);
+            await handleInitialSession(session, 'SIGNED_IN');
             return;
           }
           
@@ -194,7 +234,8 @@ export function useAuthProvider() {
 
     return () => {
       isMounted = false;
-      clearTimeout(fallbackTimeout);
+      if (eventFallbackTimeout) clearTimeout(eventFallbackTimeout);
+      if (finalFallbackTimeout) clearTimeout(finalFallbackTimeout);
       subscription.unsubscribe();
     };
   }, [supabase, fetchProfile, createUserRecords]);
