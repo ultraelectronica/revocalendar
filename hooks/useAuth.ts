@@ -105,11 +105,24 @@ export function useAuthProvider() {
     }
   }, [supabase, fetchProfile]);
 
-  // Initialize auth state
+  // Initialize auth state with timeout and retry logic
   useEffect(() => {
-    const initAuth = async () => {
+    const SESSION_TIMEOUT = 8000; // 8 seconds timeout
+    const MAX_RETRIES = 2;
+
+    const initAuth = async (retryCount = 0): Promise<void> => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Create a promise that rejects after timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session loading timeout')), SESSION_TIMEOUT);
+        });
+
+        // Race between getting session and timeout
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          timeoutPromise,
+        ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -122,9 +135,23 @@ export function useAuthProvider() {
             await createUserRecords(session.user);
           }
         }
+        
+        setLoading(false);
       } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
+        console.error(`[Auth] Error initializing auth (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+        
+        // Retry if we haven't exhausted retries
+        if (retryCount < MAX_RETRIES) {
+          console.log('[Auth] Retrying session initialization...');
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return initAuth(retryCount + 1);
+        }
+        
+        // After all retries, assume no session and stop loading
+        console.warn('[Auth] Failed to get session after retries, assuming not authenticated');
+        setSession(null);
+        setUser(null);
         setLoading(false);
       }
     };
