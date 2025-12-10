@@ -105,62 +105,51 @@ export function useAuthProvider() {
     }
   }, [supabase, fetchProfile]);
 
-  // Initialize auth state with timeout and retry logic
+  // Initialize auth state using onAuthStateChange (more reliable than getSession on refresh)
   useEffect(() => {
-    const SESSION_TIMEOUT = 8000; // 8 seconds timeout
-    const MAX_RETRIES = 2;
+    let isMounted = true;
+    let initialSessionReceived = false;
 
-    const initAuth = async (retryCount = 0): Promise<void> => {
-      try {
-        // Create a promise that rejects after timeout
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session loading timeout')), SESSION_TIMEOUT);
-        });
-
-        // Race between getting session and timeout
-        const { data: { session } } = await Promise.race([
-          supabase.auth.getSession(),
-          timeoutPromise,
-        ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
-
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Check if profile exists
-          const { data: existingProfile } = await fetchProfile(session.user.id);
-          
-          // If no profile and user is confirmed (OAuth or verified email), create profile
-          if (!existingProfile && session.user.email_confirmed_at) {
-            await createUserRecords(session.user);
-          }
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error(`[Auth] Error initializing auth (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
-        
-        // Retry if we haven't exhausted retries
-        if (retryCount < MAX_RETRIES) {
-          console.log('[Auth] Retrying session initialization...');
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return initAuth(retryCount + 1);
-        }
-        
-        // After all retries, assume no session and stop loading
-        console.warn('[Auth] Failed to get session after retries, assuming not authenticated');
+    // Set a fallback timeout in case INITIAL_SESSION never fires
+    const fallbackTimeout = setTimeout(() => {
+      if (!initialSessionReceived && isMounted) {
+        console.warn('[Auth] Fallback timeout: No initial session event received, assuming not authenticated');
         setSession(null);
         setUser(null);
         setLoading(false);
       }
-    };
+    }, 5000);
 
-    initAuth();
-
-    // Listen for auth changes
+    // Listen for auth changes - this will fire INITIAL_SESSION on mount
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+
+        console.log('[Auth] Auth state change:', event, session?.user?.email);
+
+        // Handle INITIAL_SESSION - this fires when the listener is first set up
+        if (event === 'INITIAL_SESSION') {
+          initialSessionReceived = true;
+          clearTimeout(fallbackTimeout);
+          
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            // Check if profile exists
+            const { data: existingProfile } = await fetchProfile(session.user.id);
+
+            // If no profile and user is confirmed (OAuth or verified email), create profile
+            if (!existingProfile && session.user.email_confirmed_at) {
+              await createUserRecords(session.user);
+            }
+          }
+
+          setLoading(false);
+          return;
+        }
+
+        // Handle other auth events
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -176,11 +165,17 @@ export function useAuthProvider() {
           }
         } else if (event === 'SIGNED_OUT') {
           setProfile(null);
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('[Auth] Token refreshed successfully');
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimeout);
+      subscription.unsubscribe();
+    };
   }, [supabase, fetchProfile, createUserRecords]);
 
   // Sign up - sends OTP to email for verification (does NOT create profile yet)
