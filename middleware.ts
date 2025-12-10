@@ -5,19 +5,23 @@ export async function middleware(request: NextRequest) {
   // Create a Supabase client configured for middleware
   const { supabase, response } = createMiddlewareClient(request);
 
-  // Refresh session if expired - required for Server Components
-  // This will automatically refresh the session cookie if needed
+  // IMPORTANT: Use getUser() instead of getSession() for proper token refresh
+  // getSession() is deprecated and doesn't validate the JWT on the server
+  // getUser() makes a request to Supabase Auth server to validate and refresh the session
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
-      console.error('[Middleware] Session error:', error.message);
+      // Log but don't block - user might just not be logged in
+      if (error.message !== 'Auth session missing!') {
+        console.error('[Middleware] Auth error:', error.message);
+      }
     }
     
-    // If we have a session, ensure it's refreshed
-    if (session) {
-      // getSession already handles refresh internally
-      // The refreshed tokens are set in cookies by the supabase client
+    // The getUser() call will automatically refresh the session if needed
+    // and the refreshed tokens will be set in cookies by the supabase client
+    if (user) {
+      console.log('[Middleware] User authenticated:', user.email);
     }
   } catch (e) {
     console.error('[Middleware] Unexpected error:', e);
