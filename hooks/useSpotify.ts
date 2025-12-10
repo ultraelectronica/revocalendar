@@ -382,27 +382,15 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           console.warn('[Spotify] Failed to check if track is liked:', err);
         }
         
-        // Get audio features for mood
-        let mood = state.mood;
-        if (!state.currentTrack || state.currentTrack.id !== track.id) {
-          try {
-            const features = await apiRef.current.getAudioFeatures(track.id);
-            mood = getMoodFromFeatures(features);
-          } catch (err) {
-            // Audio features might fail due to permissions or track availability
-            // This is not critical, so we just log and continue
-            console.warn('[Spotify] Failed to get audio features:', err);
-            mood = null;
-          }
+        const mood = null;
           
-          // Extract dominant color from album art
-          if (track.album.images[0]) {
-            extractDominantColor(track.album.images[0].url).then(color => {
-              setState(prev => ({ ...prev, dominantColor: color }));
-            }).catch(() => {
-              // Silently fail - not critical
-            });
-          }
+        // Extract dominant color from album art
+        if (track.album.images[0]) {
+          extractDominantColor(track.album.images[0].url).then(color => {
+            setState(prev => ({ ...prev, dominantColor: color }));
+          }).catch(() => {
+            // Silently fail - not critical
+          });
         }
 
         setState(prev => ({
