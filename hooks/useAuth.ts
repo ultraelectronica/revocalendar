@@ -108,17 +108,41 @@ export function useAuthProvider() {
   // Initialize auth state using onAuthStateChange (more reliable than getSession on refresh)
   useEffect(() => {
     let isMounted = true;
-    let initialSessionReceived = false;
+    let hasInitialized = false;
 
-    // Set a fallback timeout in case INITIAL_SESSION never fires
+    // Set a fallback timeout in case no session event fires
     const fallbackTimeout = setTimeout(() => {
-      if (!initialSessionReceived && isMounted) {
-        console.warn('[Auth] Fallback timeout: No initial session event received, assuming not authenticated');
+      if (!hasInitialized && isMounted) {
+        console.warn('[Auth] Fallback timeout: No session event received, assuming not authenticated');
         setSession(null);
         setUser(null);
         setLoading(false);
+        hasInitialized = true;
       }
     }, 5000);
+
+    // Helper function to handle initial session setup
+    const handleInitialSession = async (session: Session | null) => {
+      if (hasInitialized) return; // Prevent double initialization
+      
+      hasInitialized = true;
+      clearTimeout(fallbackTimeout);
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        // Check if profile exists
+        const { data: existingProfile } = await fetchProfile(session.user.id);
+
+        // If no profile and user is confirmed (OAuth or verified email), create profile
+        if (!existingProfile && session.user.email_confirmed_at) {
+          await createUserRecords(session.user);
+        }
+      }
+
+      setLoading(false);
+    };
 
     // Listen for auth changes - this will fire INITIAL_SESSION on mount
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -129,23 +153,28 @@ export function useAuthProvider() {
 
         // Handle INITIAL_SESSION - this fires when the listener is first set up
         if (event === 'INITIAL_SESSION') {
-          initialSessionReceived = true;
-          clearTimeout(fallbackTimeout);
-          
-          setSession(session);
-          setUser(session?.user ?? null);
+          await handleInitialSession(session);
+          return;
+        }
 
-          if (session?.user) {
-            // Check if profile exists
-            const { data: existingProfile } = await fetchProfile(session.user.id);
-
-            // If no profile and user is confirmed (OAuth or verified email), create profile
-            if (!existingProfile && session.user.email_confirmed_at) {
-              await createUserRecords(session.user);
-            }
+        // Handle SIGNED_IN - this may fire instead of/before INITIAL_SESSION after OAuth redirect
+        if (event === 'SIGNED_IN' && session?.user) {
+          // If we haven't initialized yet, treat this as our initial session
+          if (!hasInitialized) {
+            console.log('[Auth] Using SIGNED_IN as initial session');
+            await handleInitialSession(session);
+            return;
           }
-
-          setLoading(false);
+          
+          // Otherwise, handle as normal sign in (profile creation if needed)
+          setSession(session);
+          setUser(session.user);
+          
+          const { data: existingProfile } = await fetchProfile(session.user.id);
+          if (!existingProfile) {
+            await createUserRecords(session.user, pendingSignupData.current.displayName);
+            pendingSignupData.current = {};
+          }
           return;
         }
 
@@ -153,18 +182,10 @@ export function useAuthProvider() {
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN' && session?.user) {
-          // Check if profile exists, if not create it (for verified users or OAuth)
-          const { data: existingProfile } = await fetchProfile(session.user.id);
-          
-          if (!existingProfile) {
-            // User signed in without profile - create one
-            // This handles both OTP verification and OAuth sign-in
-            await createUserRecords(session.user, pendingSignupData.current.displayName);
-            pendingSignupData.current = {};
-          }
-        } else if (event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_OUT') {
           setProfile(null);
+          // Ensure loading is false after sign out
+          setLoading(false);
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('[Auth] Token refreshed successfully');
         }
