@@ -11,6 +11,7 @@ import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
 import FocusTimer from '@/components/FocusTimer';
 import SpotifyWidget from '@/components/SpotifyWidget';
+import WeatherWidget from '@/components/WeatherWidget';
 import AuthModal from '@/components/AuthModal';
 import EncryptionModal from '@/components/EncryptionModal';
 import TimezoneSelector from '@/components/TimezoneSelector';
@@ -576,8 +577,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* Mobile Focus Timer & Spotify */}
+        {/* Mobile Weather, Focus Timer & Spotify */}
         <div className="lg:hidden px-4 space-y-4">
+          <WeatherWidget />
           <FocusTimer />
           <SpotifyWidget />
         </div>
@@ -595,8 +597,9 @@ export default function Home() {
         {/* Main Layout */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-5">
-            {/* Left Sidebar - Stats, Timer & Spotify (Desktop only) */}
+            {/* Left Sidebar - Weather, Stats, Timer & Spotify (Desktop only) */}
             <aside className="w-72 flex-shrink-0 hidden lg:block space-y-4">
+              <WeatherWidget />
               <QuickStats stats={stats} />
               <FocusTimer />
               <SpotifyWidget />
