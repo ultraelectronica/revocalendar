@@ -67,23 +67,30 @@ export function useEvents(options: UseEventsOptions = {}) {
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
 
-  // Encrypt event sensitive fields
+  // Use ref for encryption to avoid dependency changes triggering refetch
+  const encryptionRef = useRef(encryption);
+  encryptionRef.current = encryption;
+
+  // Encrypt event sensitive fields (using stable ref)
   const encryptEvent = useCallback(async (event: CalendarEvent): Promise<CalendarEvent> => {
-    if (!encryption?.isUnlocked) return event;
-    return encryption.encryptFields(event, ENCRYPTED_EVENT_FIELDS);
-  }, [encryption]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return event;
+    return enc.encryptFields(event, ENCRYPTED_EVENT_FIELDS);
+  }, []);
 
-  // Decrypt event sensitive fields
+  // Decrypt event sensitive fields (using stable ref)
   const decryptEvent = useCallback(async (event: CalendarEvent): Promise<CalendarEvent> => {
-    if (!encryption?.isUnlocked) return event;
-    return encryption.decryptFields(event, ENCRYPTED_EVENT_FIELDS);
-  }, [encryption]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return event;
+    return enc.decryptFields(event, ENCRYPTED_EVENT_FIELDS);
+  }, []);
 
-  // Decrypt multiple events
+  // Decrypt multiple events (using stable ref)
   const decryptEvents = useCallback(async (events: CalendarEvent[]): Promise<CalendarEvent[]> => {
-    if (!encryption?.isUnlocked) return events;
-    return Promise.all(events.map(decryptEvent));
-  }, [encryption, decryptEvent]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return events;
+    return Promise.all(events.map(e => enc.decryptFields(e, ENCRYPTED_EVENT_FIELDS)));
+  }, []);
 
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
@@ -125,11 +132,14 @@ export function useEvents(options: UseEventsOptions = {}) {
   }, [encryptEvent]);
 
   // Fetch events from Supabase or localStorage
+  // Only refetch when userId changes, not when encryption changes
   useEffect(() => {
     const supabase = supabaseRef.current;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let isMounted = true;
 
     const fetchEvents = async () => {
+      if (!isMounted) return;
       setLoading(true);
 
       if (userId) {
@@ -143,10 +153,12 @@ export function useEvents(options: UseEventsOptions = {}) {
           .eq('user_id', userId)
           .order('date', { ascending: true });
 
-        if (!error && data) {
+        if (!error && data && isMounted) {
           const mappedEvents = data.map(mapDbEventToLocal);
           const decryptedEvents = await decryptEvents(mappedEvents);
-          setEvents(decryptedEvents);
+          if (isMounted) {
+            setEvents(decryptedEvents);
+          }
         }
 
         // Set up real-time subscription
@@ -161,33 +173,45 @@ export function useEvents(options: UseEventsOptions = {}) {
               filter: `user_id=eq.${userId}`,
             },
             async (payload) => {
+              if (!isMounted) return;
               if (payload.eventType === 'INSERT') {
                 const mapped = mapDbEventToLocal(payload.new as DbEvent);
                 const decrypted = await decryptEvent(mapped);
-                setEvents(prev => [...prev, decrypted]);
+                if (isMounted) {
+                  setEvents(prev => [...prev, decrypted]);
+                }
               } else if (payload.eventType === 'UPDATE') {
                 const mapped = mapDbEventToLocal(payload.new as DbEvent);
                 const decrypted = await decryptEvent(mapped);
-                setEvents(prev =>
-                  prev.map(e => e.id === decrypted.id ? decrypted : e)
-                );
+                if (isMounted) {
+                  setEvents(prev =>
+                    prev.map(e => e.id === decrypted.id ? decrypted : e)
+                  );
+                }
               } else if (payload.eventType === 'DELETE') {
-                setEvents(prev => prev.filter(e => e.id !== (payload.old as DbEvent).id));
+                if (isMounted) {
+                  setEvents(prev => prev.filter(e => e.id !== (payload.old as DbEvent).id));
+                }
               }
             }
           )
           .subscribe();
       } else {
         // Fallback to localStorage for unauthenticated users
-    setEvents(loadEvents());
+        if (isMounted) {
+          setEvents(loadEvents());
+        }
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     fetchEvents();
 
     return () => {
+      isMounted = false;
       if (channel) {
         supabase.removeChannel(channel);
       }

@@ -13,6 +13,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   showWeekends: true,
   firstDayOfWeek: 0,
   showCompletedEvents: true,
+  // Use browser timezone if available, otherwise UTC (for SSR safety)
+  timezone: typeof window !== 'undefined' 
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
+    : 'UTC',
 };
 
 // Migrate old event format to new format

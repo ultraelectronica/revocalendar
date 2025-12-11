@@ -56,6 +56,7 @@ export interface DbUserSettings {
   show_weekends: boolean;
   first_day_of_week: number;
   show_completed_events: boolean;
+  timezone: string | null;
   updated_at: string;
 }
 

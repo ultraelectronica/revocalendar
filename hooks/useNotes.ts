@@ -39,23 +39,30 @@ export function useNotes(options: UseNotesOptions = {}) {
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
 
-  // Encrypt note sensitive fields
+  // Use ref for encryption to avoid dependency changes triggering refetch
+  const encryptionRef = useRef(encryption);
+  encryptionRef.current = encryption;
+
+  // Encrypt note sensitive fields (using stable ref)
   const encryptNote = useCallback(async (note: Note): Promise<Note> => {
-    if (!encryption?.isUnlocked) return note;
-    return encryption.encryptFields(note, ENCRYPTED_NOTE_FIELDS);
-  }, [encryption]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return note;
+    return enc.encryptFields(note, ENCRYPTED_NOTE_FIELDS);
+  }, []);
 
-  // Decrypt note sensitive fields
+  // Decrypt note sensitive fields (using stable ref)
   const decryptNote = useCallback(async (note: Note): Promise<Note> => {
-    if (!encryption?.isUnlocked) return note;
-    return encryption.decryptFields(note, ENCRYPTED_NOTE_FIELDS);
-  }, [encryption]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return note;
+    return enc.decryptFields(note, ENCRYPTED_NOTE_FIELDS);
+  }, []);
 
-  // Decrypt multiple notes
+  // Decrypt multiple notes (using stable ref)
   const decryptNotes = useCallback(async (notes: Note[]): Promise<Note[]> => {
-    if (!encryption?.isUnlocked) return notes;
-    return Promise.all(notes.map(decryptNote));
-  }, [encryption, decryptNote]);
+    const enc = encryptionRef.current;
+    if (!enc?.isUnlocked) return notes;
+    return Promise.all(notes.map(n => enc.decryptFields(n, ENCRYPTED_NOTE_FIELDS)));
+  }, []);
 
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
@@ -102,11 +109,14 @@ export function useNotes(options: UseNotesOptions = {}) {
   }, [encryptNote]);
 
   // Fetch notes from Supabase or localStorage
+  // Only refetch when userId changes, not when encryption changes
   useEffect(() => {
     const supabase = supabaseRef.current;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let isMounted = true;
 
     const fetchNotes = async () => {
+      if (!isMounted) return;
       setLoading(true);
 
       if (userId) {
@@ -121,10 +131,12 @@ export function useNotes(options: UseNotesOptions = {}) {
           .order('pinned', { ascending: false })
           .order('updated_at', { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && isMounted) {
           const mappedNotes = data.map(mapDbNoteToLocal);
           const decryptedNotes = await decryptNotes(mappedNotes);
-          setNotes(decryptedNotes);
+          if (isMounted) {
+            setNotes(decryptedNotes);
+          }
         }
 
         // Set up real-time subscription
@@ -139,33 +151,45 @@ export function useNotes(options: UseNotesOptions = {}) {
               filter: `user_id=eq.${userId}`,
             },
             async (payload) => {
+              if (!isMounted) return;
               if (payload.eventType === 'INSERT') {
                 const mapped = mapDbNoteToLocal(payload.new as DbNote);
                 const decrypted = await decryptNote(mapped);
-                setNotes(prev => [decrypted, ...prev]);
+                if (isMounted) {
+                  setNotes(prev => [decrypted, ...prev]);
+                }
               } else if (payload.eventType === 'UPDATE') {
                 const mapped = mapDbNoteToLocal(payload.new as DbNote);
                 const decrypted = await decryptNote(mapped);
-                setNotes(prev =>
-                  prev.map(n => n.id === decrypted.id ? decrypted : n)
-                );
+                if (isMounted) {
+                  setNotes(prev =>
+                    prev.map(n => n.id === decrypted.id ? decrypted : n)
+                  );
+                }
               } else if (payload.eventType === 'DELETE') {
-                setNotes(prev => prev.filter(n => n.id !== (payload.old as DbNote).id));
+                if (isMounted) {
+                  setNotes(prev => prev.filter(n => n.id !== (payload.old as DbNote).id));
+                }
               }
             }
           )
           .subscribe();
       } else {
         // Fallback to localStorage for unauthenticated users
-    setNotes(loadNotes());
+        if (isMounted) {
+          setNotes(loadNotes());
+        }
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     fetchNotes();
 
     return () => {
+      isMounted = false;
       if (channel) {
         supabase.removeChannel(channel);
       }

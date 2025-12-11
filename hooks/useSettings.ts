@@ -9,6 +9,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showWeekends: true,
   firstDayOfWeek: 0,
   showCompletedEvents: true,
+  // Use UTC as safe default for SSR - will be updated to local timezone on client mount
+  timezone: 'UTC',
 };
 
 // Map database settings to local AppSettings type
@@ -19,6 +21,7 @@ function mapDbSettingsToLocal(dbSettings: DbUserSettings): AppSettings {
     showWeekends: dbSettings.show_weekends,
     firstDayOfWeek: dbSettings.first_day_of_week as 0 | 1,
     showCompletedEvents: dbSettings.show_completed_events,
+    timezone: dbSettings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }
 
@@ -62,6 +65,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       show_weekends: localSettings.showWeekends,
       first_day_of_week: localSettings.firstDayOfWeek,
       show_completed_events: localSettings.showCompletedEvents,
+      timezone: localSettings.timezone,
     });
     
     hasMigratedRef.current = true;
@@ -70,8 +74,10 @@ export function useSettings(options: UseSettingsOptions = {}) {
   // Fetch settings from Supabase or localStorage
   useEffect(() => {
     const supabase = supabaseRef.current;
+    let isMounted = true;
 
     const fetchSettings = async () => {
+      if (!isMounted) return;
       setLoading(true);
 
       if (userId) {
@@ -85,18 +91,30 @@ export function useSettings(options: UseSettingsOptions = {}) {
           .eq('user_id', userId)
           .single();
 
-        if (!error && data) {
+        if (!error && data && isMounted) {
           setSettings(mapDbSettingsToLocal(data));
+        } else if (isMounted) {
+          // If no settings found, use browser timezone as default
+          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          setSettings(prev => ({ ...prev, timezone: browserTimezone }));
         }
       } else {
         // Fallback to localStorage for unauthenticated users
-    setSettings(loadSettings());
+        if (isMounted) {
+          setSettings(loadSettings());
+        }
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, [userId, migrateLocalToSupabase]);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
@@ -127,6 +145,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       if (newSettings.showWeekends !== undefined) dbUpdate.show_weekends = newSettings.showWeekends;
       if (newSettings.firstDayOfWeek !== undefined) dbUpdate.first_day_of_week = newSettings.firstDayOfWeek;
       if (newSettings.showCompletedEvents !== undefined) dbUpdate.show_completed_events = newSettings.showCompletedEvents;
+      if (newSettings.timezone !== undefined) dbUpdate.timezone = newSettings.timezone;
 
       await supabase
         .from('user_settings')
@@ -152,6 +171,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
           show_weekends: DEFAULT_SETTINGS.showWeekends,
           first_day_of_week: DEFAULT_SETTINGS.firstDayOfWeek,
           show_completed_events: DEFAULT_SETTINGS.showCompletedEvents,
+          timezone: DEFAULT_SETTINGS.timezone,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId);
