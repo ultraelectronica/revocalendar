@@ -73,12 +73,12 @@ export default function TimezoneSelector({
   timezone,
   onTimezoneChange,
 }: TimezoneSelectorProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [time, setTime] = useState(new Date());
   const [isHovered, setIsHovered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
 
   // Update time every second
   useEffect(() => {
@@ -88,53 +88,54 @@ export default function TimezoneSelector({
     return () => clearInterval(interval);
   }, []);
 
-  // Focus search input when expanded
+  // Focus search input when dialog opens
   useEffect(() => {
-    if (isExpanded && searchInputRef.current) {
-      searchInputRef.current.focus();
+    if (isDialogOpen && searchInputRef.current) {
+      // Small delay to ensure the dialog is rendered
+      setTimeout(() => searchInputRef.current?.focus(), 100);
     }
-  }, [isExpanded]);
+  }, [isDialogOpen]);
 
-  // Close on click outside
+  // Lock body scroll when dialog is open
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsExpanded(false);
-        setSearchQuery('');
-      }
+    if (isDialogOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
     };
-
-    if (isExpanded) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isExpanded]);
+  }, [isDialogOpen]);
 
   // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsExpanded(false);
+        setIsDialogOpen(false);
         setSearchQuery('');
       }
     };
 
-    if (isExpanded) {
+    if (isDialogOpen) {
       document.addEventListener('keydown', handleKeyDown);
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isExpanded]);
+  }, [isDialogOpen]);
 
   // Get current timezone info
   const currentTimezoneInfo = useMemo(() => {
-    const found = ALL_TIMEZONES.find((tz) => tz.id === timezone);
+    // Guard against undefined timezone - use browser's timezone as fallback
+    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    const found = ALL_TIMEZONES.find((t) => t.id === tz);
     if (found) return found;
 
     // Fallback: try to derive info from the timezone string
-    const parts = timezone.split('/');
+    const parts = tz.split('/');
     const city = parts[parts.length - 1].replace(/_/g, ' ');
     return {
-      id: timezone,
+      id: tz,
       city,
       abbr: 'Local',
       offset: 0,
@@ -172,7 +173,7 @@ export default function TimezoneSelector({
   const formattedTime = useMemo(() => {
     try {
       return time.toLocaleTimeString('en-US', {
-        timeZone: timezone,
+        timeZone: currentTimezoneInfo.id,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -186,13 +187,13 @@ export default function TimezoneSelector({
         hour12: true,
       });
     }
-  }, [time, timezone]);
+  }, [time, currentTimezoneInfo.id]);
 
   // Format date for display
   const formattedDate = useMemo(() => {
     try {
       return time.toLocaleDateString('en-US', {
-        timeZone: timezone,
+        timeZone: currentTimezoneInfo.id,
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -204,7 +205,7 @@ export default function TimezoneSelector({
         day: 'numeric',
       });
     }
-  }, [time, timezone]);
+  }, [time, currentTimezoneInfo.id]);
 
   // Filter timezones based on search
   const filteredTimezones = useMemo(() => {
@@ -250,7 +251,13 @@ export default function TimezoneSelector({
   // Handle timezone selection
   const handleSelect = (tzId: string) => {
     onTimezoneChange(tzId);
-    setIsExpanded(false);
+    setIsDialogOpen(false);
+    setSearchQuery('');
+  };
+
+  // Close dialog
+  const closeDialog = () => {
+    setIsDialogOpen(false);
     setSearchQuery('');
   };
 
@@ -261,16 +268,15 @@ export default function TimezoneSelector({
   }, [time]);
 
   return (
-    <div ref={containerRef} className="relative">
-      {/* Collapsed State - Elegant Time Display */}
+    <>
+      {/* Compact Time Display Card */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => setIsDialogOpen(true)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`
-          w-full glass-card p-4 transition-all duration-500 group cursor-pointer
-          ${isExpanded ? 'ring-2 ring-cyan-500/30' : ''}
-          ${isHovered && !isExpanded ? 'bg-gradient-to-br from-white/[0.12] to-white/[0.04]' : ''}
+          w-full glass-card p-4 transition-all duration-500 group cursor-pointer text-left
+          ${isHovered ? 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] ring-1 ring-cyan-500/20' : ''}
         `}
       >
         <div className="flex items-center justify-between">
@@ -344,34 +350,10 @@ export default function TimezoneSelector({
               <p className="text-xs text-white/40">{currentTimezoneInfo.abbr}</p>
             </div>
 
-            {/* Expand Indicator */}
-            <svg
-              className={`w-5 h-5 text-white/40 transition-transform duration-300 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded State - Timezone Picker */}
-      {isExpanded && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="glass-card p-4 max-h-[400px] overflow-hidden flex flex-col">
-            {/* Search Bar */}
-            <div className="relative mb-4">
+            {/* Change Icon */}
+            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40"
+                className="w-4 h-4 text-white/40 group-hover:text-cyan-400 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -380,101 +362,68 @@ export default function TimezoneSelector({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search city, timezone, or GMT offset..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:bg-white/10 focus:border-cyan-500/50 transition-all"
-              />
             </div>
+          </div>
+        </div>
+      </button>
 
-            {/* Timezone List */}
-            <div className="overflow-y-auto flex-1 pr-1 space-y-4">
-              {Object.entries(filteredTimezones).map(([region, zones]) => (
-                <div key={region}>
-                  {/* Region Header */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                      {region}
-                    </span>
-                    <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
+      {/* Dialog Modal */}
+      {isDialogOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={closeDialog}
+          />
+
+          {/* Dialog Container */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              ref={dialogContentRef}
+              className="glass-card w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Dialog Header */}
+              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {/* Animated Globe Icon */}
+                  <div className="relative w-10 h-10 flex items-center justify-center">
+                    <div className="absolute w-3 h-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500" />
+                    <div
+                      className="absolute w-full h-full rounded-full border border-cyan-500/40"
+                      style={{
+                        transform: `rotate(${orbitalRotation}deg)`,
+                        transition: 'transform 1s linear',
+                      }}
+                    >
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-cyan-400" />
+                    </div>
                   </div>
-
-                  {/* Timezone Grid */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {zones.map((zone) => {
-                      const isSelected = zone.id === timezone;
-                      const zoneTime = getTimeForTimezone(zone.id);
-
-                      return (
-                        <button
-                          key={zone.id}
-                          onClick={() => handleSelect(zone.id)}
-                          className={`
-                            relative p-3 rounded-xl text-left transition-all duration-200 group/item
-                            ${
-                              isSelected
-                                ? 'bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30'
-                                : 'bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20'
-                            }
-                          `}
-                        >
-                          {/* Selected Indicator */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2">
-                              <svg
-                                className="w-4 h-4 text-cyan-400"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                          )}
-
-                          {/* City & Time */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`text-sm font-medium ${
-                                isSelected ? 'text-white' : 'text-white/80'
-                              }`}
-                            >
-                              {zone.city}
-                            </span>
-                            <span
-                              className={`text-xs font-mono ${
-                                isSelected ? 'text-cyan-400' : 'text-white/40'
-                              }`}
-                            >
-                              {zoneTime}
-                            </span>
-                          </div>
-
-                          {/* Timezone Abbr */}
-                          <p className="text-xs text-white/40 mt-0.5">
-                            {zone.abbr} • GMT{zone.offset >= 0 ? '+' : ''}{zone.offset}
-                          </p>
-                        </button>
-                      );
-                    })}
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Select Timezone</h2>
+                    <p className="text-xs text-white/40">Choose your preferred timezone for the calendar</p>
                   </div>
                 </div>
-              ))}
 
-              {/* No Results */}
-              {Object.keys(filteredTimezones).length === 0 && (
-                <div className="text-center py-8">
+                {/* Close Button */}
+                <button
+                  onClick={closeDialog}
+                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="p-4 border-b border-white/5">
+                <div className="relative">
                   <svg
-                    className="w-12 h-12 mx-auto text-white/20 mb-3"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -482,30 +431,154 @@ export default function TimezoneSelector({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <p className="text-white/40 text-sm">No timezones found</p>
-                  <p className="text-white/20 text-xs mt-1">
-                    Try searching for a city or GMT offset
-                  </p>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search city, timezone, or GMT offset..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:bg-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-3 h-3 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Footer Hint */}
-            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-              <span className="text-xs text-white/30">
-                <kbd className="px-1.5 py-0.5 bg-white/10 rounded">Esc</kbd> to close
-              </span>
-              <span className="text-xs text-white/30">
-                {ALL_TIMEZONES.length} timezones available
-              </span>
+              {/* Timezone List */}
+              <div className="overflow-y-auto flex-1 p-4 space-y-5">
+                {Object.entries(filteredTimezones).map(([region, zones]) => (
+                  <div key={region}>
+                    {/* Region Header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-semibold text-cyan-400/80 uppercase tracking-wider">
+                        {region}
+                      </span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/20 to-transparent" />
+                    </div>
+
+                    {/* Timezone Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {zones.map((zone) => {
+                        const isSelected = zone.id === timezone;
+                        const zoneTime = getTimeForTimezone(zone.id);
+
+                        return (
+                          <button
+                            key={zone.id}
+                            onClick={() => handleSelect(zone.id)}
+                            className={`
+                              relative p-4 rounded-xl text-left transition-all duration-200 group/item
+                              ${
+                                isSelected
+                                  ? 'bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 ring-1 ring-cyan-500/20'
+                                  : 'bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20'
+                              }
+                            `}
+                          >
+                            {/* Selected Indicator */}
+                            {isSelected && (
+                              <div className="absolute top-3 right-3">
+                                <svg
+                                  className="w-5 h-5 text-cyan-400"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+
+                            {/* City & Time */}
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span
+                                className={`text-base font-semibold ${
+                                  isSelected ? 'text-white' : 'text-white/90'
+                                }`}
+                              >
+                                {zone.city}
+                              </span>
+                              <span
+                                className={`text-sm font-mono ${
+                                  isSelected ? 'text-cyan-400' : 'text-white/50'
+                                }`}
+                              >
+                                {zoneTime}
+                              </span>
+                            </div>
+
+                            {/* Timezone Details */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-white/40">
+                                {zone.abbr}
+                              </span>
+                              <span className="text-white/20">•</span>
+                              <span className={`text-xs ${zone.offset >= 0 ? 'text-emerald-400/70' : 'text-violet-400/70'}`}>
+                                GMT{zone.offset >= 0 ? '+' : ''}{zone.offset}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* No Results */}
+                {Object.keys(filteredTimezones).length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-white/30"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-white/50 text-sm font-medium">No timezones found</p>
+                    <p className="text-white/30 text-xs mt-1">
+                      Try searching for a city or GMT offset
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Dialog Footer */}
+              <div className="p-4 border-t border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center gap-2 text-xs text-white/30">
+                  <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono">Esc</kbd>
+                  <span>to close</span>
+                </div>
+                <span className="text-xs text-white/30">
+                  {ALL_TIMEZONES.length} timezones available
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
-    </div>
+    </>
   );
 }
