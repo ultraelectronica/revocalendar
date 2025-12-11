@@ -57,61 +57,71 @@ function formatTime(time: string): string {
   return `${hours}:${minutes}`;
 }
 
-// Animated sun/moon arc component
-function SunArc({ sunrise, sunset, currentTime }: { sunrise: string; sunset: string; currentTime: string }) {
+// Sunrise/Sunset timeline - horizontal design for narrow containers
+function SunTimeline({ sunrise, sunset, currentTime }: { sunrise: string; sunset: string; currentTime: string }) {
   const sunriseMinutes = parseTimeToMinutes(sunrise);
   const sunsetMinutes = parseTimeToMinutes(sunset);
   const currentMinutes = parseTimeToMinutes(currentTime);
   
   const dayLength = sunsetMinutes - sunriseMinutes;
   const elapsed = Math.max(0, Math.min(dayLength, currentMinutes - sunriseMinutes));
-  const progress = dayLength > 0 ? (elapsed / dayLength) * 100 : 0;
+  const progress = dayLength > 0 ? (elapsed / dayLength) * 100 : 50;
   const isDay = currentMinutes >= sunriseMinutes && currentMinutes <= sunsetMinutes;
   
   return (
-    <div className="relative h-16 mt-2">
-      {/* Arc path */}
-      <svg className="w-full h-full" viewBox="0 0 100 50" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#f97316" stopOpacity="0.3" />
-            <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.3" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M 5 45 Q 50 -10 95 45"
-          fill="none"
-          stroke="url(#arcGradient)"
-          strokeWidth="2"
-          strokeDasharray="4 2"
-        />
-        {/* Sun/Moon position */}
+    <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-orange-500/5 via-amber-500/10 to-violet-500/5 border border-white/5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">{isDay ? '☀️' : '🌙'}</span>
+          <span className="text-xs text-white/60">{isDay ? 'Daylight' : 'Night'}</span>
+        </div>
         {isDay && (
-          <circle
-            cx={5 + (90 * progress / 100)}
-            cy={45 - Math.sin((progress / 100) * Math.PI) * 40}
-            r="4"
-            fill="#fbbf24"
-            className="drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]"
-          >
-            <animate
-              attributeName="r"
-              values="4;5;4"
-              dur="2s"
-              repeatCount="indefinite"
-            />
-          </circle>
+          <span className="text-[10px] text-white/40">
+            {Math.round(progress)}% of day
+          </span>
         )}
-      </svg>
+      </div>
+      
+      {/* Timeline track */}
+      <div className="relative h-2 bg-white/10 rounded-full overflow-visible">
+        {/* Progress fill */}
+        <div 
+          className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-orange-400 via-amber-400 to-amber-300 transition-all duration-500"
+          style={{ width: `${isDay ? progress : 0}%` }}
+        />
+        
+        {/* Sun indicator */}
+        {isDay && (
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-500"
+            style={{ left: `${progress}%` }}
+          >
+            {/* Glow */}
+            <div className="absolute inset-0 w-5 h-5 -m-0.5 rounded-full bg-amber-400/40 blur-sm animate-pulse" />
+            {/* Sun circle */}
+            <div className="relative w-4 h-4 rounded-full bg-gradient-to-br from-amber-300 to-orange-400 border-2 border-amber-200 shadow-lg shadow-amber-500/50" />
+          </div>
+        )}
+        
+        {/* Night moon indicator */}
+        {!isDay && (
+          <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2">
+            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 border border-slate-200/50 shadow-lg shadow-slate-400/30" />
+          </div>
+        )}
+      </div>
+      
       {/* Labels */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-white/50">
-        <span className="flex items-center gap-1">
-          <span className="text-orange-400">↑</span> {formatTime(sunrise)}
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="text-violet-400">↓</span> {formatTime(sunset)}
-        </span>
+      <div className="flex justify-between mt-2 text-[10px]">
+        <div className="flex items-center gap-1">
+          <span className="text-orange-400">↑</span>
+          <span className="text-white/60">{formatTime(sunrise)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-white/60">{formatTime(sunset)}</span>
+          <span className="text-violet-400">↓</span>
+        </div>
       </div>
     </div>
   );
@@ -292,9 +302,9 @@ export default function WeatherWidget() {
         )}
       </div>
 
-      {/* Sunrise/Sunset Arc */}
+      {/* Sunrise/Sunset Timeline */}
       {today && (
-        <SunArc 
+        <SunTimeline 
           sunrise={today.astro.sunrise}
           sunset={today.astro.sunset}
           currentTime={currentTimeStr}
