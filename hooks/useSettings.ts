@@ -9,9 +9,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showWeekends: true,
   firstDayOfWeek: 0,
   showCompletedEvents: true,
-  timezone: typeof window !== 'undefined' 
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
-    : 'UTC',
+  // Use UTC as safe default for SSR - will be updated to local timezone on client mount
+  timezone: 'UTC',
 };
 
 // Map database settings to local AppSettings type
@@ -75,8 +74,10 @@ export function useSettings(options: UseSettingsOptions = {}) {
   // Fetch settings from Supabase or localStorage
   useEffect(() => {
     const supabase = supabaseRef.current;
+    let isMounted = true;
 
     const fetchSettings = async () => {
+      if (!isMounted) return;
       setLoading(true);
 
       if (userId) {
@@ -90,18 +91,30 @@ export function useSettings(options: UseSettingsOptions = {}) {
           .eq('user_id', userId)
           .single();
 
-        if (!error && data) {
+        if (!error && data && isMounted) {
           setSettings(mapDbSettingsToLocal(data));
+        } else if (isMounted) {
+          // If no settings found, use browser timezone as default
+          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          setSettings(prev => ({ ...prev, timezone: browserTimezone }));
         }
       } else {
         // Fallback to localStorage for unauthenticated users
-    setSettings(loadSettings());
+        if (isMounted) {
+          setSettings(loadSettings());
+        }
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, [userId, migrateLocalToSupabase]);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {

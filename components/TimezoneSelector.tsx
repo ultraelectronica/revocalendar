@@ -75,18 +75,27 @@ export default function TimezoneSelector({
 }: TimezoneSelectorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState<Date | null>(null); // Start null to avoid hydration mismatch
   const [isHovered, setIsHovered] = useState(false);
+  const [isMounted, setIsMounted] = useState(false); // Track if component has mounted
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dialogContentRef = useRef<HTMLDivElement>(null);
 
-  // Update time every second
+  // Set mounted state and initialize time on client-side only
   useEffect(() => {
+    setIsMounted(true);
+    setTime(new Date());
+  }, []);
+
+  // Update time every second (only after mount)
+  useEffect(() => {
+    if (!isMounted) return;
+    
     const interval = setInterval(() => {
       setTime(new Date());
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isMounted]);
 
   // Focus search input when dialog opens
   useEffect(() => {
@@ -171,6 +180,7 @@ export default function TimezoneSelector({
 
   // Format time for display
   const formattedTime = useMemo(() => {
+    if (!time) return '--:--:-- --'; // Placeholder during SSR/before mount
     try {
       return time.toLocaleTimeString('en-US', {
         timeZone: currentTimezoneInfo.id,
@@ -191,6 +201,7 @@ export default function TimezoneSelector({
 
   // Format date for display
   const formattedDate = useMemo(() => {
+    if (!time) return '--- --- --'; // Placeholder during SSR/before mount
     try {
       return time.toLocaleDateString('en-US', {
         timeZone: currentTimezoneInfo.id,
@@ -234,6 +245,7 @@ export default function TimezoneSelector({
   // Get time for a specific timezone
   const getTimeForTimezone = useCallback(
     (tz: string) => {
+      if (!time) return '--:--';
       try {
         return time.toLocaleTimeString('en-US', {
           timeZone: tz,
@@ -263,6 +275,7 @@ export default function TimezoneSelector({
 
   // Calculate orbital animation rotation
   const orbitalRotation = useMemo(() => {
+    if (!time) return 0; // Static position during SSR/before mount
     const seconds = time.getSeconds();
     return (seconds / 60) * 360;
   }, [time]);
