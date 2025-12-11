@@ -995,16 +995,15 @@ export default function SpotifyWidget() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center md:justify-between mt-3">
-          <div className="flex items-center gap-1">
-            {/* Volume - shown on left for small screens */}
-            <div className="md:hidden">
-              <VolumeControl
-                volume={spotify.volume}
-                onVolumeChange={spotify.setVolume}
-                color={spotify.dominantColor}
-              />
-            </div>
+        <div className="mt-3">
+          {/* All controls in one centered row */}
+          <div className="flex items-center justify-center gap-1">
+            {/* Volume - left side */}
+            <VolumeControl
+              volume={spotify.volume}
+              onVolumeChange={spotify.setVolume}
+              color={spotify.dominantColor}
+            />
 
             {/* Shuffle */}
             <button
@@ -1070,22 +1069,7 @@ export default function SpotifyWidget() {
               )}
             </button>
 
-            {/* Devices - shown on right of repeat for small screens */}
-            <div className="md:hidden">
-              <DeviceSelector
-                devices={spotify.devices}
-                onSelect={spotify.transferToDevice}
-              />
-            </div>
-          </div>
-
-          {/* Volume and Devices - only shown on md+ screens */}
-          <div className="hidden md:flex items-center gap-1">
-            <VolumeControl
-              volume={spotify.volume}
-              onVolumeChange={spotify.setVolume}
-              color={spotify.dominantColor}
-            />
+            {/* Device - right side */}
             <DeviceSelector
               devices={spotify.devices}
               onSelect={spotify.transferToDevice}
