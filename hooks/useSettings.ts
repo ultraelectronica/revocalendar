@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   showWeekends: true,
   firstDayOfWeek: 0,
   showCompletedEvents: true,
+  timezone: typeof window !== 'undefined' 
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
+    : 'UTC',
 };
 
 // Map database settings to local AppSettings type
@@ -19,6 +22,7 @@ function mapDbSettingsToLocal(dbSettings: DbUserSettings): AppSettings {
     showWeekends: dbSettings.show_weekends,
     firstDayOfWeek: dbSettings.first_day_of_week as 0 | 1,
     showCompletedEvents: dbSettings.show_completed_events,
+    timezone: dbSettings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }
 
@@ -62,6 +66,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       show_weekends: localSettings.showWeekends,
       first_day_of_week: localSettings.firstDayOfWeek,
       show_completed_events: localSettings.showCompletedEvents,
+      timezone: localSettings.timezone,
     });
     
     hasMigratedRef.current = true;
@@ -127,6 +132,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       if (newSettings.showWeekends !== undefined) dbUpdate.show_weekends = newSettings.showWeekends;
       if (newSettings.firstDayOfWeek !== undefined) dbUpdate.first_day_of_week = newSettings.firstDayOfWeek;
       if (newSettings.showCompletedEvents !== undefined) dbUpdate.show_completed_events = newSettings.showCompletedEvents;
+      if (newSettings.timezone !== undefined) dbUpdate.timezone = newSettings.timezone;
 
       await supabase
         .from('user_settings')
@@ -152,6 +158,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
           show_weekends: DEFAULT_SETTINGS.showWeekends,
           first_day_of_week: DEFAULT_SETTINGS.firstDayOfWeek,
           show_completed_events: DEFAULT_SETTINGS.showCompletedEvents,
+          timezone: DEFAULT_SETTINGS.timezone,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId);

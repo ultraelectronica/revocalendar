@@ -95,4 +95,5 @@ export interface AppSettings {
   showWeekends: boolean;
   firstDayOfWeek: 0 | 1; // 0 = Sunday, 1 = Monday
   showCompletedEvents: boolean;
+  timezone: string; // IANA timezone string (e.g., 'America/New_York')
 }

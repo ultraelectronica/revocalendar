@@ -13,10 +13,12 @@ import FocusTimer from '@/components/FocusTimer';
 import SpotifyWidget from '@/components/SpotifyWidget';
 import AuthModal from '@/components/AuthModal';
 import EncryptionModal from '@/components/EncryptionModal';
+import TimezoneSelector from '@/components/TimezoneSelector';
 import { useAuth } from '@/hooks/useAuth';
 import { useEncryption } from '@/hooks/useEncryption';
 import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
+import { useSettings } from '@/hooks/useSettings';
 import { CalendarEvent } from '@/types';
 import { MONTHS } from '@/utils/dateUtils';
 
@@ -336,8 +338,24 @@ export default function Home() {
     syncing: notesSyncing,
   } = useNotes({ userId, encryption: encryptionHelpers });
 
+  // Settings hook for timezone
+  const { settings, updateSettings } = useSettings({ userId });
+
   const isSyncing = eventsSyncing || notesSyncing;
   const isLoading = authLoading || eventsLoading || notesLoading || encryptionLoading;
+
+  // Debug: Log loading states to identify which one is stuck
+  useEffect(() => {
+    console.log('[Loading Debug] States:', {
+      authLoading,
+      eventsLoading,
+      notesLoading,
+      encryptionLoading,
+      isLoading,
+      userId,
+      isAuthenticated,
+    });
+  }, [authLoading, eventsLoading, notesLoading, encryptionLoading, isLoading, userId, isAuthenticated]);
 
   // Show encryption modal when authenticated but encryption needs setup or unlock
   useEffect(() => {
@@ -634,6 +652,14 @@ export default function Home() {
             onDayClick={handleDayClick}
           />
         </div>
+
+              {/* Timezone Selector - Below Calendar */}
+              <div className="mt-4">
+                <TimezoneSelector
+                  timezone={settings.timezone}
+                  onTimezoneChange={(tz) => updateSettings({ timezone: tz })}
+                />
+              </div>
             </section>
 
             {/* Right Sidebar - Plans & Notes */}
