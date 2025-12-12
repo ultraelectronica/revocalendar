@@ -225,30 +225,23 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      // Check if new password matches old password by attempting to sign in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: session.user.email,
-          password: password,
-        });
-        // If sign-in succeeds, passwords match - reject the update
-        if (!signInError) {
-          setError('Cannot use your previous password. Please choose a different one.');
-          setLoading(false);
-          return;
-        }
-      }
-
+      // Update the password using the recovery session
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (error) {
-        setError(error.message);
+        // Check if the error indicates same password (Supabase may return this)
+        if (error.message.toLowerCase().includes('same') || 
+            error.message.toLowerCase().includes('different')) {
+          setError('Cannot use your previous password. Please choose a different one.');
+        } else {
+          setError(error.message);
+        }
       } else {
+        // Password updated successfully - user should already be authenticated
         setSuccess(true);
-        // Redirect to home immediately since user is already authenticated
+        // Redirect to home
         router.push('/');
       }
     } catch (err) {
