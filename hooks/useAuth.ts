@@ -18,6 +18,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<Pick<DbProfile, 'display_name' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
 }
 
@@ -412,6 +413,13 @@ export function useAuthProvider() {
     return { error };
   }, [supabase]);
 
+  const updatePassword = useCallback(async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    return { error };
+  }, [supabase]);
+
   const updateProfile = useCallback(async (updates: Partial<Pick<DbProfile, 'display_name' | 'avatar_url'>>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
@@ -444,6 +452,7 @@ export function useAuthProvider() {
     signInWithGoogle,
     signOut,
     resetPassword,
+    updatePassword,
     updateProfile,
   };
 }
