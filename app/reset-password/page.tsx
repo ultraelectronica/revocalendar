@@ -225,6 +225,21 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
+      // Check if new password matches old password by attempting to sign in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: session.user.email,
+          password: password,
+        });
+        // If sign-in succeeds, passwords match - reject the update
+        if (!signInError) {
+          setError('Cannot use your previous password. Please choose a different one.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -233,10 +248,8 @@ export default function ResetPasswordPage() {
         setError(error.message);
       } else {
         setSuccess(true);
-        // Redirect to home after 2 seconds
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
+        // Redirect to home immediately since user is already authenticated
+        router.push('/');
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -306,7 +319,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-white">Password Updated!</h1>
             <p className="text-sm text-white/50 mt-2">
-              Your password has been successfully reset. Redirecting you to the app...
+              Your password has been successfully reset. Redirecting you now...
             </p>
           </div>
 
