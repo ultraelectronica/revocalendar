@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Note } from '@/types';
 
 interface NotesSectionProps {
@@ -32,6 +32,12 @@ export default function NotesSection({
   const [newNoteColor, setNewNoteColor] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Track client-side mounting to prevent hydration mismatch in relative dates
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleAddNote = () => {
     if (newNoteContent.trim()) {
@@ -61,6 +67,12 @@ export default function NotesSection({
   };
 
   const formatDate = (dateStr: string) => {
+    // During SSR or before mount, show static date format to prevent hydration mismatch
+    if (!isMounted) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-us', { month: 'short', day: 'numeric' });
+    }
+    
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Password requirements (same as AuthModal)
 const PASSWORD_REQUIREMENTS = {
@@ -137,7 +138,8 @@ export default function ResetPasswordPage() {
   const [scanningConfirm, setScanningConfirm] = useState(false);
   
   const router = useRouter();
-  const supabase = createClient();
+  const supabaseRef = useRef<SupabaseClient>(createClient());
+  const supabase = supabaseRef.current;
 
   // Password validation
   const passwordValidation = useMemo(() => ({
@@ -223,14 +225,22 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
+    console.log('[ResetPassword] Starting password update...');
 
     try {
-      // Update the password using the recovery session
-      const { error } = await supabase.auth.updateUser({
+      // Directly call updateUser - the session is already validated at mount
+      console.log('[ResetPassword] Calling updateUser...');
+      
+      const { data, error } = await supabase.auth.updateUser({
         password: password,
       });
+      
+      console.log('[ResetPassword] updateUser completed:', { hasData: !!data, hasError: !!error });
+      
+      console.log('[ResetPassword] updateUser response:', { data, error });
 
       if (error) {
+        console.error('[ResetPassword] Update error:', error);
         // Check if the error indicates same password (Supabase may return this)
         if (error.message.toLowerCase().includes('same') || 
             error.message.toLowerCase().includes('different')) {
@@ -239,14 +249,22 @@ export default function ResetPasswordPage() {
           setError(error.message);
         }
       } else {
-        // Password updated successfully - user should already be authenticated
+        console.log('[ResetPassword] Password updated successfully');
+        // Password updated successfully - sign out all sessions to clear any interfering sessions
+        // This ensures the user starts fresh with their new password
+        await supabase.auth.signOut({ scope: 'global' });
+        console.log('[ResetPassword] All sessions signed out');
         setSuccess(true);
-        // Redirect to home
-        router.push('/');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('[ResetPassword] Exception:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
+      }
     } finally {
+      console.log('[ResetPassword] Finished, setting loading to false');
       setLoading(false);
     }
   };
@@ -302,7 +320,16 @@ export default function ResetPasswordPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center p-4">
-        <div className="glass-card p-8 max-w-md w-full">
+        {/* Background effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative glass-card p-8 max-w-md w-full animate-in fade-in zoom-in-95 duration-200">
+          {/* Top accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500 rounded-t-2xl" />
+
           {/* Header */}
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
@@ -312,27 +339,36 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-white">Password Updated!</h1>
             <p className="text-sm text-white/50 mt-2">
-              Your password has been successfully reset. Redirecting you now...
+              Your password has been successfully reset. You can now log in with your new password.
             </p>
           </div>
 
-          {/* Animated progress bar */}
-          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"
-              style={{
-                animation: 'progress 2s linear forwards',
-              }}
-            />
+          {/* Go back to login button */}
+          <button
+            onClick={() => router.push('/')}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all hover:-translate-y-0.5"
+          >
+            Go Back to Login
+          </button>
+
+          {/* Security notice */}
+          <div className="mt-6 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+            <div className="flex gap-2">
+              <svg className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <p className="text-xs text-white/40 leading-relaxed">
+                All other sessions have been signed out for security. Please log in with your new password.
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-white/30">Plan • Track • Achieve</p>
+            <p className="text-xs text-white/20 mt-1">© 2025 Revo. All rights reserved.</p>
           </div>
         </div>
-
-        <style jsx>{`
-          @keyframes progress {
-            from { width: 0%; }
-            to { width: 100%; }
-          }
-        `}</style>
       </div>
     );
   }
@@ -539,7 +575,7 @@ export default function ResetPasswordPage() {
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
               <p className="text-xs text-white/40 leading-relaxed">
-                After resetting your password, you&apos;ll be signed in automatically and redirected to the app.
+                After resetting your password, all sessions will be signed out for security. You&apos;ll need to log in with your new password.
               </p>
             </div>
           </div>

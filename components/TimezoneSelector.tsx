@@ -152,14 +152,15 @@ export default function TimezoneSelector({
     };
   }, [timezone]);
 
-  // Get local timezone for offset calculation
+  // Get local timezone for offset calculation (only on client)
   const localTimezone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-    []
+    () => isMounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC',
+    [isMounted]
   );
 
-  // Calculate offset from local time
+  // Calculate offset from local time (only meaningful after mount)
   const offsetFromLocal = useMemo(() => {
+    if (!isMounted) return null; // Don't calculate during SSR
     const localDate = new Date();
     const localOffset = localDate.getTimezoneOffset() * -1; // in minutes
     const selectedOffset = currentTimezoneInfo.offset * 60; // convert hours to minutes
@@ -176,7 +177,7 @@ export default function TimezoneSelector({
       return `${sign}${diffHours}h`;
     }
     return `${sign}${hours}h ${minutes}m`;
-  }, [currentTimezoneInfo.offset]);
+  }, [currentTimezoneInfo.offset, isMounted]);
 
   // Format time for display
   const formattedTime = useMemo(() => {

@@ -213,12 +213,15 @@ export default function WeatherWidget() {
   const { weather, loading, error, permissionDenied, refresh } = useWeather();
   const [expanded, setExpanded] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState('');
+  const [isDay, setIsDay] = useState(true); // Default to day, will update on client
 
   // Update current time every minute
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setCurrentTimeStr(`${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+      const hours = now.getHours();
+      setCurrentTimeStr(`${hours}:${String(now.getMinutes()).padStart(2, '0')}`);
+      setIsDay(hours >= 6 && hours < 18);
     };
     updateTime();
     const interval = setInterval(updateTime, 60000);
@@ -233,11 +236,6 @@ export default function WeatherWidget() {
   const uvLevel = getUVLevel(current.uv);
   const aqiLevel = current.air_quality ? getAQILevel(current.air_quality.us_epa_index) : null;
   const today = forecast[0];
-  
-  // Determine if it's day or night
-  const now = new Date();
-  const hours = now.getHours();
-  const isDay = hours >= 6 && hours < 18;
 
   return (
     <div className="glass-card p-4 group">
