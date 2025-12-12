@@ -284,6 +284,7 @@ export default function Home() {
   const [sidebarTab, setSidebarTab] = useState<'plans' | 'notes'>('plans');
   const [showMobileStats, setShowMobileStats] = useState(false);
   const [showEncryptionModal, setShowEncryptionModal] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Auth hook
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -391,6 +392,11 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Track client-side mounting to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
     setIsEventListOpen(true);
@@ -449,7 +455,11 @@ export default function Home() {
     return { month: dt.getMonth(), year: dt.getFullYear() };
   };
 
-  const { month: currentMonth, year: currentYear } = getCurrentDate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { month: currentMonth, year: currentYear } = useMemo(
+    () => getCurrentDate(),
+    [nav, isMounted] // Include isMounted to recalculate after hydration
+  );
 
   // Memoize background props to prevent re-renders
   const backgroundProps = useMemo(() => ({

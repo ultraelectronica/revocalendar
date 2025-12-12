@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types';
 import { WEEKDAYS_SHORT, getMonthDates } from '@/utils/dateUtils';
 import CalendarDay from './CalendarDay';
@@ -12,7 +12,16 @@ interface CalendarProps {
 }
 
 export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Track client-side mounting to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const { days } = useMemo(() => {
+    // Use a stable date during SSR to prevent hydration mismatch
+    // The actual date will be calculated on client after mount
     const dt = new Date();
     dt.setMonth(dt.getMonth() + nav);
 
@@ -21,7 +30,7 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
     const days = getMonthDates(year, month);
 
     return { days, month, year };
-  }, [nav]);
+  }, [nav, isMounted]);
 
   return (
     <div className="w-full">
