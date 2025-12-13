@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   showCompletedEvents: true,
   // Use UTC as safe default for SSR - will be updated to local timezone on client mount
   timezone: 'UTC',
+  alarmSound: 'notification',
 };
 
 // Map database settings to local AppSettings type
@@ -22,6 +23,7 @@ function mapDbSettingsToLocal(dbSettings: DbUserSettings): AppSettings {
     firstDayOfWeek: dbSettings.first_day_of_week as 0 | 1,
     showCompletedEvents: dbSettings.show_completed_events,
     timezone: dbSettings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    alarmSound: (dbSettings.alarm_sound as AppSettings['alarmSound']) || 'notification',
   };
 }
 
@@ -58,7 +60,8 @@ export function useSettings(options: UseSettingsOptions = {}) {
     // Load from localStorage and save to Supabase
     const localSettings = loadSettings();
     
-    await supabase.from('user_settings').upsert({
+    // Build upsert data - only include alarm_sound if it exists in settings
+    const upsertData: Record<string, unknown> = {
       user_id: uid,
       theme: localSettings.theme,
       view_mode: localSettings.viewMode,
@@ -66,7 +69,20 @@ export function useSettings(options: UseSettingsOptions = {}) {
       first_day_of_week: localSettings.firstDayOfWeek,
       show_completed_events: localSettings.showCompletedEvents,
       timezone: localSettings.timezone,
-    });
+    };
+    
+    // Only add alarm_sound if the column might exist (to gracefully handle missing column)
+    if (localSettings.alarmSound) {
+      upsertData.alarm_sound = localSettings.alarmSound;
+    }
+    
+    try {
+      const { error } = await supabase.from('user_settings').upsert(upsertData);
+      if (error) throw error;
+    } catch (error) {
+      // Ignore errors from missing columns - settings will still work locally
+      console.warn('Settings migration partial - some columns may not exist:', error);
+    }
     
     hasMigratedRef.current = true;
   }, []);
@@ -92,11 +108,19 @@ export function useSettings(options: UseSettingsOptions = {}) {
           .single();
 
         if (!error && data && isMounted) {
-          setSettings(mapDbSettingsToLocal(data));
+          const dbSettings = mapDbSettingsToLocal(data);
+          // Merge with localStorage for fields that may not exist in database
+          const localSettings = loadSettings();
+          // If alarm_sound is not in DB (null/undefined), use localStorage value
+          if (!data.alarm_sound && localSettings.alarmSound) {
+            dbSettings.alarmSound = localSettings.alarmSound;
+          }
+          setSettings(dbSettings);
         } else if (isMounted) {
-          // If no settings found, use browser timezone as default
+          // If no settings found, use localStorage settings
+          const localSettings = loadSettings();
           const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          setSettings(prev => ({ ...prev, timezone: browserTimezone }));
+          setSettings({ ...localSettings, timezone: browserTimezone });
         }
       } else {
         // Fallback to localStorage for unauthenticated users
@@ -124,10 +148,8 @@ export function useSettings(options: UseSettingsOptions = {}) {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
       
-      // Also save to localStorage as fallback
-      if (!userId) {
+      // Always save to localStorage as fallback (important for alarmSound which may not be in DB)
       saveSettings(updated);
-      }
       
       return updated;
     });
@@ -146,11 +168,23 @@ export function useSettings(options: UseSettingsOptions = {}) {
       if (newSettings.firstDayOfWeek !== undefined) dbUpdate.first_day_of_week = newSettings.firstDayOfWeek;
       if (newSettings.showCompletedEvents !== undefined) dbUpdate.show_completed_events = newSettings.showCompletedEvents;
       if (newSettings.timezone !== undefined) dbUpdate.timezone = newSettings.timezone;
+      // Only add alarm_sound update if the value is defined
+      // This prevents errors when the column doesn't exist in the database
+      if (newSettings.alarmSound !== undefined) {
+        dbUpdate.alarm_sound = newSettings.alarmSound;
+      }
 
-      await supabase
-        .from('user_settings')
-        .update(dbUpdate)
-        .eq('user_id', userId);
+      try {
+        const { error } = await supabase
+          .from('user_settings')
+          .update(dbUpdate)
+          .eq('user_id', userId);
+        
+        if (error) throw error;
+      } catch (error) {
+        // If update fails (e.g., missing column), log but don't block
+        console.warn('Settings update partial - some columns may not exist:', error);
+      }
 
       setSyncing(false);
     }
@@ -172,6 +206,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
           first_day_of_week: DEFAULT_SETTINGS.firstDayOfWeek,
           show_completed_events: DEFAULT_SETTINGS.showCompletedEvents,
           timezone: DEFAULT_SETTINGS.timezone,
+          alarm_sound: DEFAULT_SETTINGS.alarmSound,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId);

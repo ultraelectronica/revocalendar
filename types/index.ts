@@ -89,6 +89,33 @@ export interface Note {
   color: string | null;
 }
 
+export type AlarmSound = 
+  | 'blob'
+  | 'completion'
+  | 'dimple'
+  | 'echo'
+  | 'notification'
+  | 'paint'
+  | 'pollen'
+  | 'raid'
+  | 'success'
+  | 'surprise'
+  | 'wink';
+
+export const ALARM_SOUNDS: { id: AlarmSound; name: string; icon: string }[] = [
+  { id: 'blob', name: 'Blob', icon: '🫧' },
+  { id: 'completion', name: 'Completion', icon: '✅' },
+  { id: 'dimple', name: 'Dimple', icon: '💫' },
+  { id: 'echo', name: 'Echo', icon: '🔔' },
+  { id: 'notification', name: 'Notification', icon: '📢' },
+  { id: 'paint', name: 'Paint', icon: '🎨' },
+  { id: 'pollen', name: 'Pollen', icon: '🌸' },
+  { id: 'raid', name: 'Raid', icon: '⚔️' },
+  { id: 'success', name: 'Success', icon: '🎉' },
+  { id: 'surprise', name: 'Surprise', icon: '🎁' },
+  { id: 'wink', name: 'Wink', icon: '😉' },
+];
+
 export interface AppSettings {
   theme: 'dark' | 'light';
   viewMode: ViewMode;
@@ -96,4 +123,5 @@ export interface AppSettings {
   firstDayOfWeek: 0 | 1; // 0 = Sunday, 1 = Monday
   showCompletedEvents: boolean;
   timezone: string; // IANA timezone string (e.g., 'America/New_York')
+  alarmSound: AlarmSound; // Sound file to use for timer/alarm notifications
 }

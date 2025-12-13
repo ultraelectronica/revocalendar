@@ -57,6 +57,7 @@ export interface DbUserSettings {
   first_day_of_week: number;
   show_completed_events: boolean;
   timezone: string | null;
+  alarm_sound: string | null;
   updated_at: string;
 }
 
