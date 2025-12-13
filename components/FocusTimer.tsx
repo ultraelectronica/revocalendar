@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { AlarmSound } from '@/types';
+import AlarmSoundSelector from './AlarmSoundSelector';
 
 interface TimerPreset {
   id: string;
@@ -56,7 +58,12 @@ const TIMER_PRESETS: TimerPreset[] = [
 
 type TimerPhase = 'idle' | 'work' | 'break';
 
-export default function FocusTimer() {
+interface FocusTimerProps {
+  alarmSound?: AlarmSound;
+  onAlarmSoundChange?: (sound: AlarmSound) => void;
+}
+
+export default function FocusTimer({ alarmSound = 'notification', onAlarmSoundChange }: FocusTimerProps) {
   const [selectedPreset, setSelectedPreset] = useState<TimerPreset>(TIMER_PRESETS[0]);
   const [customWorkTime, setCustomWorkTime] = useState(25);
   const [customBreakTime, setCustomBreakTime] = useState(5);
@@ -191,8 +198,8 @@ export default function FocusTimer() {
   return (
     <div className="glass-card p-4 mt-4">
       {/* Hidden audio element for alarm */}
-      <audio ref={audioRef} preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2AfYWFgn13cXh+goWGhIN8d3V6foOGhoWDfXh1eX2ChoaFg316dnh8gIOFhYSDfXp4en2BhIWEg4B8eXl7foGDhISCgH16eXt+gYOEhIKAfXp5e36Bg4SEgn99enl7foGDhISCf316eXt+gYOEg4J/fXp5e36Bg4SDgn99enl7foGDhIOCf316eXt+gYOEg4J/fXp5e36Bg4SDgn99enl7foGDhIOCf316eXt+gYOEg4J/fXp5e36Bg4SDgn99enl7foGDhIOCf316eXt+gYOEg4J/fXp5e36Bg4SDgn99enl7fn+Cg4OCf316eXt+f4KDg4J/fXp5e35/goODgn99enl7fn+Cg4OCf316eXt+f4KDg4J/fXp5e35/goODgn99enl7fn+Cg4OCf316eXt+f4KDg4J/fXp5e35/goODgn99enl7fn+Cg4OCf316eXt+f4KDg4J/fXp5e35/goODgn99enl7fn+Cg4OCf316eXt+f4KCgoJ/fXp5e35/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgn99enl7fn9/goKCgX98enl7fn9/goKCgX98enl7fn9/goKBgX98enl7fn9/goKBgX98enl7fn9/goGBgX98enl7fn9/gYGBgX98enl7fn9/gYGBgX98enl7fn9/gYGBgX98enl7fn9/gYGBgX98enl7fn9/gYGBgX98enl7foCAgYGBgH58enl7foCAgYGAgH58enl7foCAgYGAgH58enl7foCAgYGAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgICAgH58enl7foCAgIB/gH58enl7fn+AgIB/gH58enl7fn+AgIB/gH58enl7fn+AgIB/gH58enl7fn+AgIB/gH58enl7fn+AgIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/gH58enl7fn9/gIB/f358enl7fn9/gIB/f358enl7fn9/gIB/f358enl7fn9/f4B/f358enl7fn9/f4B/f358enl7fn9/f4B/f358enl7fn9/f4B/f358enl7fn9/f39/f358enl7fn9/f39/f358enl7fn9/f39/f358enl7fn9/f39/f358enl7fn9/f39/f358enl7fn9/f39/f358enl7fn9/f39/f358" type="audio/wav" />
+      <audio ref={audioRef} preload="auto" key={alarmSound}>
+        <source src={`/notification_sounds/${alarmSound}.mp3`} type="audio/mpeg" />
       </audio>
 
       {/* Header */}
@@ -285,6 +292,14 @@ export default function FocusTimer() {
               }`} />
             </button>
           </div>
+
+          {/* Alarm Sound Selector */}
+          {soundEnabled && onAlarmSoundChange && (
+            <AlarmSoundSelector
+              value={alarmSound}
+              onChange={onAlarmSoundChange}
+            />
+          )}
         </div>
       )}
 

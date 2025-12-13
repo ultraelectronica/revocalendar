@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   timezone: typeof window !== 'undefined' 
     ? Intl.DateTimeFormat().resolvedOptions().timeZone 
     : 'UTC',
+  alarmSound: 'notification', // Default alarm sound
 };
 
 // Migrate old event format to new format

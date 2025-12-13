@@ -590,7 +590,10 @@ export default function Home() {
         {/* Mobile Weather, Focus Timer & Spotify */}
         <div className="lg:hidden px-4 space-y-4">
           <WeatherWidget />
-          <FocusTimer />
+          <FocusTimer
+            alarmSound={settings.alarmSound}
+            onAlarmSoundChange={(sound) => updateSettings({ alarmSound: sound })}
+          />
           <SpotifyWidget />
         </div>
 
@@ -620,7 +623,10 @@ export default function Home() {
             <aside className="w-72 flex-shrink-0 hidden lg:block space-y-4">
               <WeatherWidget />
               <QuickStats stats={stats} />
-              <FocusTimer />
+              <FocusTimer
+                alarmSound={settings.alarmSound}
+                onAlarmSoundChange={(sound) => updateSettings({ alarmSound: sound })}
+              />
             </aside>
 
             {/* Main Calendar */}
