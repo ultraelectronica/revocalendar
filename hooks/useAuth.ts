@@ -139,7 +139,7 @@ export function useAuthProvider() {
       setLoading(false);
     };
 
-    // Fallback: If no auth events fire within 2 seconds, try to get session directly
+    // Fallback: If no auth events fire within 1.5 seconds, try to get session directly
     // This handles cases where onAuthStateChange doesn't fire in production/edge environments
     eventFallbackTimeout = setTimeout(async () => {
       if (hasInitialized || !isMounted) return;
@@ -153,11 +153,28 @@ export function useAuthProvider() {
         if (!isMounted || hasInitialized) return;
         
         if (error) {
+          const errorMessage = error.message?.toLowerCase() || '';
           console.log('[Auth] Direct session check error:', error.message);
-          // Not an error if session is missing, just means not logged in
-          if (error.message !== 'Auth session missing!') {
+          
+          // Check if this is an invalid refresh token error
+          const isInvalidSession = 
+            errorMessage.includes('refresh token') ||
+            errorMessage.includes('invalid') ||
+            errorMessage.includes('expired') ||
+            (errorMessage.includes('not found') && errorMessage.includes('token'));
+          
+          if (isInvalidSession) {
+            console.warn('[Auth] Invalid/expired session detected, clearing...');
+            // Sign out to clear the corrupted session cookies
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              console.warn('[Auth] Error during sign out cleanup:', signOutError);
+            }
+          } else if (error.message !== 'Auth session missing!') {
             console.error('[Auth] Unexpected auth error:', error);
           }
+          
           await handleInitialSession(null, 'direct-check-no-session');
         } else if (user) {
           console.log('[Auth] Found user via direct check:', user.email);
@@ -173,9 +190,9 @@ export function useAuthProvider() {
           await handleInitialSession(null, 'fallback-error');
         }
       }
-    }, 2000);
+    }, 1500);
 
-    // Final fallback: If still not initialized after 6 seconds, assume not authenticated
+    // Final fallback: If still not initialized after 4 seconds, assume not authenticated
     finalFallbackTimeout = setTimeout(() => {
       if (!hasInitialized && isMounted) {
         console.warn('[Auth] Final fallback timeout: assuming not authenticated');
@@ -184,7 +201,7 @@ export function useAuthProvider() {
         setLoading(false);
         hasInitialized = true;
       }
-    }, 6000);
+    }, 4000);
 
     // Listen for auth changes - this will fire INITIAL_SESSION on mount
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
