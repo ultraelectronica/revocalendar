@@ -95,12 +95,17 @@ export default function FocusTimer({ alarmSound = 'notification', onAlarmSoundCh
       });
     }
     
-    // Browser notification
+    // Browser notification (wrapped in try-catch for mobile browser compatibility)
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(phase === 'work' ? '🎉 Focus session complete!' : '💪 Break over!', {
-        body: phase === 'work' ? 'Time for a break!' : 'Ready to focus again?',
-        icon: '/favicon.svg',
-      });
+      try {
+        new Notification(phase === 'work' ? '🎉 Focus session complete!' : '💪 Break over!', {
+          body: phase === 'work' ? 'Time for a break!' : 'Ready to focus again?',
+          icon: '/favicon.svg',
+        });
+      } catch {
+        // Notification creation can fail on mobile browsers (especially iOS Safari)
+        // This is expected behavior - just silently ignore
+      }
     }
   }, [soundEnabled, phase]);
 
