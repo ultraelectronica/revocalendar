@@ -12,8 +12,19 @@ export async function middleware(request: NextRequest) {
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
-      // Log but don't block - user might just not be logged in
-      if (error.message !== 'Auth session missing!') {
+      // Handle specific auth errors that indicate a corrupted session
+      const errorMessage = error.message?.toLowerCase() || '';
+      const isInvalidSession = 
+        errorMessage.includes('refresh token') ||
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('expired') ||
+        errorMessage.includes('not found');
+      
+      if (isInvalidSession) {
+        console.warn('[Middleware] Invalid session detected, will be cleared on client');
+        // The client-side will handle session cleanup
+        // We just let the request through without blocking
+      } else if (error.message !== 'Auth session missing!') {
         console.error('[Middleware] Auth error:', error.message);
       }
     }
@@ -24,7 +35,9 @@ export async function middleware(request: NextRequest) {
       console.log('[Middleware] User authenticated:', user.email);
     }
   } catch (e) {
+    // Catch any unexpected errors to prevent middleware from crashing
     console.error('[Middleware] Unexpected error:', e);
+    // Continue anyway - don't block the request
   }
 
   return response();
