@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import FloatingLines from '@/components/FloatingLines';
 import AuthModal from '@/components/AuthModal';
 
@@ -311,9 +312,9 @@ export default function LandingPage() {
               <span className="text-sm text-white/40">© 2026 Revo. All rights reserved.</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-white/40">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Contact</a>
+              <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+              <a href="mailto:contact@revo.app" className="hover:text-white transition-colors">Contact</a>
             </div>
           </div>
         </footer>
