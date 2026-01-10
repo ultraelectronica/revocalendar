@@ -15,6 +15,7 @@ import WeatherWidget from '@/components/WeatherWidget';
 import AuthModal from '@/components/AuthModal';
 import EncryptionModal from '@/components/EncryptionModal';
 import TimezoneSelector from '@/components/TimezoneSelector';
+import LandingPage from '@/components/LandingPage';
 import { useAuth } from '@/hooks/useAuth';
 import { useEncryption } from '@/hooks/useEncryption';
 import { useEvents } from '@/hooks/useEvents';
@@ -471,6 +472,11 @@ export default function Home() {
     parallax: true,
     mixBlendMode: 'screen' as const,
   }), []);
+
+  // Show landing page for unauthenticated users
+  if (!authLoading && !isAuthenticated) {
+    return <LandingPage />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">

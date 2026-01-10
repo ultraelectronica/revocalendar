@@ -491,7 +491,9 @@ function FloatingLines({
     const clock = new Clock();
 
     const setSize = () => {
-      const el = containerRef.current!;
+      const el = containerRef.current;
+      if (!el) return;
+      
       const width = el.clientWidth || 1;
       const height = el.clientHeight || 1;
 
