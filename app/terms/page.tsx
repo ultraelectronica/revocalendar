@@ -109,8 +109,8 @@ export default function TermsPage() {
         <h2 className="text-lg font-semibold text-white mb-3">8. Contact Us</h2>
         <p className="text-white/60 text-sm leading-relaxed">
           Questions about these terms? Contact us at{' '}
-          <a href="mailto:athrundiscinity@protonmail.com" className="text-cyan-400 hover:text-cyan-300 transition-colors">
-            athrundiscinity@protonmail.com
+          <a href="mailto:heiminrei22@gmail.com" className="text-cyan-400 hover:text-cyan-300 transition-colors">
+            heiminrei22@gmail.com
           </a>
         </p>
       </section>

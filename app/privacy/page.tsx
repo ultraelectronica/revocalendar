@@ -86,8 +86,8 @@ export default function PrivacyPage() {
         <h2 className="text-lg font-semibold text-white mb-3">6. Contact Us</h2>
         <p className="text-white/60 text-sm leading-relaxed">
           Questions about this privacy policy? Contact us at{' '}
-          <a href="mailto:athrundiscinity@protonmail.com" className="text-cyan-400 hover:text-cyan-300 transition-colors">
-            athrundiscinity@protonmail.com
+          <a href="mailto:heiminrei22@gmail.com" className="text-cyan-400 hover:text-cyan-300 transition-colors">
+            heiminrei22@gmail.com
           </a>
         </p>
       </section>
