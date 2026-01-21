@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { createClient, DbProfile } from '@/lib/supabase';
+import { createClient, createPasswordResetClient, DbProfile } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -42,7 +42,14 @@ export function useAuthProvider() {
   // Store pending signup data for profile creation after verification
   const pendingSignupData = useRef<{ displayName?: string }>({});
 
-  const supabase = createClient();
+  const isResetPasswordPage = typeof window !== 'undefined' && window.location.pathname === '/reset-password';
+  const supabase = useMemo(() => {
+    if (isResetPasswordPage) {
+      // On reset-password page, avoid reading/writing auth sessions
+      return createPasswordResetClient();
+    }
+    return createClient();
+  }, [isResetPasswordPage]);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -108,6 +115,11 @@ export function useAuthProvider() {
 
   // Initialize auth state using onAuthStateChange with fallback for production
   useEffect(() => {
+    if (isResetPasswordPage) {
+      // Don't initialize auth state on reset-password page
+      setLoading(false);
+      return;
+    }
     let isMounted = true;
     let hasInitialized = false;
     let eventFallbackTimeout: NodeJS.Timeout | null = null;
@@ -116,6 +128,21 @@ export function useAuthProvider() {
     // Helper function to handle initial session setup
     const handleInitialSession = async (session: Session | null, source: string) => {
       if (hasInitialized || !isMounted) return; // Prevent double initialization
+      
+      // CRITICAL: Don't authenticate if we're on the reset-password page
+      // Recovery sessions should not be treated as full authentication
+      const isResetPasswordPage = typeof window !== 'undefined' && 
+        window.location.pathname === '/reset-password';
+      
+      if (isResetPasswordPage && session?.user) {
+        console.log(`[Auth] Recovery session detected on reset-password page - NOT initializing authentication`);
+        hasInitialized = true;
+        if (eventFallbackTimeout) clearTimeout(eventFallbackTimeout);
+        if (finalFallbackTimeout) clearTimeout(finalFallbackTimeout);
+        setLoading(false);
+        // Don't set user or session - let the reset-password page handle it
+        return;
+      }
       
       hasInitialized = true;
       if (eventFallbackTimeout) clearTimeout(eventFallbackTimeout);
@@ -210,14 +237,48 @@ export function useAuthProvider() {
 
         console.log('[Auth] Auth state change:', event, session?.user?.email);
 
+        // CRITICAL: Don't treat PASSWORD_RECOVERY as a login event
+        // Recovery sessions should only allow password updates, not full authentication
+        if (event === 'PASSWORD_RECOVERY') {
+          console.log('[Auth] Password recovery session detected - NOT logging user in');
+          // Don't set user or session - this is only for password reset
+          // The reset-password page will handle the recovery session directly
+          setLoading(false);
+          return;
+        }
+
         // Handle INITIAL_SESSION - this fires when the listener is first set up
+        // Check if it's a recovery session by checking if we're on reset-password page
         if (event === 'INITIAL_SESSION') {
+          // Check if this is a recovery session (user came from password reset link)
+          // Recovery sessions typically have a specific type or we can check the URL
+          const isRecoverySession = typeof window !== 'undefined' && 
+            window.location.pathname === '/reset-password' &&
+            session?.user;
+          
+          if (isRecoverySession) {
+            console.log('[Auth] Initial session is a recovery session - NOT logging user in');
+            // Don't authenticate - just allow the reset password page to handle it
+            setLoading(false);
+            return;
+          }
+          
           await handleInitialSession(session, 'INITIAL_SESSION');
           return;
         }
 
         // Handle SIGNED_IN - this may fire instead of/before INITIAL_SESSION after OAuth redirect
         if (event === 'SIGNED_IN' && session?.user) {
+          // Check if this is a recovery session (shouldn't happen, but be safe)
+          const isRecoverySession = typeof window !== 'undefined' && 
+            window.location.pathname === '/reset-password';
+          
+          if (isRecoverySession) {
+            console.log('[Auth] SIGNED_IN on reset-password page - treating as recovery, NOT logging in');
+            setLoading(false);
+            return;
+          }
+          
           // If we haven't initialized yet, treat this as our initial session
           if (!hasInitialized) {
             await handleInitialSession(session, 'SIGNED_IN');
@@ -256,7 +317,7 @@ export function useAuthProvider() {
       if (finalFallbackTimeout) clearTimeout(finalFallbackTimeout);
       subscription.unsubscribe();
     };
-  }, [supabase, fetchProfile, createUserRecords]);
+  }, [supabase, fetchProfile, createUserRecords, isResetPasswordPage]);
 
   // Sign up - sends OTP to email for verification (does NOT create profile yet)
   const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
@@ -424,10 +485,66 @@ export function useAuthProvider() {
   }, [supabase]);
 
   const resetPassword = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+    // Get the redirect URL - prefer environment variable, fallback to window location
+    const getRedirectUrl = (): string => {
+      if (typeof window === 'undefined') {
+        // Server-side: use environment variable
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+        if (siteUrl) {
+          const cleanUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+          return `${cleanUrl.replace(/\/$/, '')}/reset-password`;
+        }
+        return '/reset-password';
+      }
+      
+      // Client-side: use current origin
+      return `${window.location.origin}/reset-password`;
+    };
+
+    const redirectTo = getRedirectUrl();
+    
+    console.log('[Auth] Initiating password reset for:', email);
+    console.log('[Auth] Redirect URL:', redirectTo);
+    
+    // Add timeout to prevent hanging (15 seconds - Supabase should respond much faster)
+    const timeoutPromise = new Promise<{ error: AuthError }>((resolve) => {
+      setTimeout(() => {
+        console.warn('[Auth] Password reset request timed out after 15 seconds');
+        resolve({
+          error: {
+            name: 'TimeoutError',
+            message: 'Password reset request timed out. Please try again.',
+          } as AuthError,
+        });
+      }, 15000); // 15 second timeout
     });
-    return { error };
+
+    try {
+      const startTime = Date.now();
+      
+      // Race between the actual call and timeout
+      const result = await Promise.race([
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo,
+        }).then(({ error }) => {
+          const duration = Date.now() - startTime;
+          console.log(`[Auth] Password reset request completed in ${duration}ms`, error ? `with error: ${error.message}` : 'successfully');
+          return { error };
+        }),
+        timeoutPromise,
+      ]);
+
+      return result;
+    } catch (err) {
+      // Handle any unexpected errors
+      console.error('[Auth] Password reset error:', err);
+      return {
+        error: {
+          name: 'UnexpectedError',
+          message: err instanceof Error ? err.message : 'An unexpected error occurred',
+        } as AuthError,
+      };
+    }
   }, [supabase]);
 
   const updatePassword = useCallback(async (newPassword: string) => {

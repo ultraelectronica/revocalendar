@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@/lib/supabase';
+import { createPasswordResetClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -138,8 +138,9 @@ export default function ResetPasswordPage() {
   const [scanningConfirm, setScanningConfirm] = useState(false);
   
   const router = useRouter();
-  const supabaseRef = useRef<SupabaseClient>(createClient());
+  const supabaseRef = useRef<SupabaseClient>(createPasswordResetClient());
   const supabase = supabaseRef.current;
+  const hasExchangedCodeRef = useRef(false);
 
   // Password validation
   const passwordValidation = useMemo(() => ({
@@ -176,7 +177,25 @@ export default function ResetPasswordPage() {
 
   // Check if user has a valid recovery session
   useEffect(() => {
+    const getRecoveryCode = () => {
+      if (typeof window === 'undefined') return null;
+      return new URL(window.location.href).searchParams.get('code');
+    };
+
     const checkSession = async () => {
+      const recoveryCode = getRecoveryCode();
+
+      if (recoveryCode && !hasExchangedCodeRef.current) {
+        hasExchangedCodeRef.current = true;
+        console.log('[ResetPassword] Exchanging recovery code for session...');
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(recoveryCode);
+        if (exchangeError) {
+          console.error('[ResetPassword] Error exchanging recovery code:', exchangeError);
+          setIsValidSession(false);
+          return;
+        }
+      }
+
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -186,7 +205,7 @@ export default function ResetPasswordPage() {
       }
 
       // Check if this is a recovery session (user clicked reset password link)
-      if (session?.user) {
+      if (session?.user && recoveryCode) {
         setIsValidSession(true);
       } else {
         setIsValidSession(false);
@@ -199,7 +218,8 @@ export default function ResetPasswordPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[ResetPassword] Auth event:', event);
-        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        const recoveryCode = getRecoveryCode();
+        if (recoveryCode && (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session))) {
           setIsValidSession(true);
         }
       }
@@ -227,18 +247,33 @@ export default function ResetPasswordPage() {
     setLoading(true);
     console.log('[ResetPassword] Starting password update...');
 
+    // Helper function to add timeout to a promise
+    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(errorMessage));
+        }, timeoutMs);
+      });
+      return Promise.race([promise, timeoutPromise]);
+    };
+
     try {
       // Directly call updateUser - the session is already validated at mount
       console.log('[ResetPassword] Calling updateUser...');
+      const startTime = Date.now();
       
-      const { data, error } = await supabase.auth.updateUser({
-        password: password,
-      });
+      // Add timeout to updateUser call (15 seconds)
+      const { data, error } = await withTimeout(
+        supabase.auth.updateUser({
+          password: password,
+        }),
+        15000,
+        'Password update request timed out. Please try again.'
+      );
       
-      console.log('[ResetPassword] updateUser completed:', { hasData: !!data, hasError: !!error });
+      const duration = Date.now() - startTime;
+      console.log(`[ResetPassword] updateUser completed in ${duration}ms:`, { hasData: !!data, hasError: !!error });
       
-      console.log('[ResetPassword] updateUser response:', { data, error });
-
       if (error) {
         console.error('[ResetPassword] Update error:', error);
         // Check if the error indicates same password (Supabase may return this)
@@ -248,18 +283,39 @@ export default function ResetPasswordPage() {
         } else {
           setError(error.message);
         }
-      } else {
-        console.log('[ResetPassword] Password updated successfully');
-        // Password updated successfully - sign out all sessions to clear any interfering sessions
-        // This ensures the user starts fresh with their new password
-        await supabase.auth.signOut({ scope: 'global' });
-        console.log('[ResetPassword] All sessions signed out');
-        setSuccess(true);
+        // Don't continue to success - let finally block handle loading state
+        return;
       }
+
+      console.log('[ResetPassword] Password updated successfully');
+      
+      // Password updated successfully - sign out all sessions to clear any interfering sessions
+      // This ensures the user starts fresh with their new password
+      // Add timeout to signOut call (10 seconds) - don't block success if signOut fails
+      try {
+        console.log('[ResetPassword] Signing out all sessions...');
+        await withTimeout(
+          supabase.auth.signOut({ scope: 'global' }),
+          10000,
+          'Sign out timed out, but password was updated successfully.'
+        );
+        console.log('[ResetPassword] All sessions signed out');
+      } catch (signOutError) {
+        // Don't fail the whole operation if signOut times out or fails
+        console.warn('[ResetPassword] Sign out warning:', signOutError);
+        // Continue to success state anyway
+      }
+      
+      setSuccess(true);
     } catch (err) {
       console.error('[ResetPassword] Exception:', err);
       if (err instanceof Error) {
-        setError(err.message);
+        // Check if it's a timeout error
+        if (err.message.includes('timed out')) {
+          setError(err.message);
+        } else {
+          setError(err.message);
+        }
       } else {
         setError('An unexpected error occurred');
       }
