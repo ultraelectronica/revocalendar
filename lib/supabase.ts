@@ -1,5 +1,15 @@
 import { createBrowserClient } from '@supabase/ssr';
 
+type CreateBrowserClientOptions = Parameters<typeof createBrowserClient>[2];
+type BrowserAuthOverrides = {
+  auth?: {
+    detectSessionInUrl?: boolean;
+    persistSession?: boolean;
+    autoRefreshToken?: boolean;
+  };
+};
+type CreateClientOptions = CreateBrowserClientOptions | BrowserAuthOverrides;
+
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const anonKey =
@@ -14,9 +24,23 @@ function getSupabaseEnv() {
   return { url, anonKey };
 }
 
-export function createClient() {
+export function createClient(options?: CreateClientOptions) {
   const { url, anonKey } = getSupabaseEnv();
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient(url, anonKey, options as CreateBrowserClientOptions);
+}
+
+// Use for password reset flows to avoid persisting recovery sessions
+export function createPasswordResetClient() {
+  const { url, anonKey } = getSupabaseEnv();
+  return createBrowserClient(url, anonKey, {
+    auth: {
+      // Keep recovery session in memory only so other tabs don't get logged in
+      persistSession: false,
+      autoRefreshToken: false,
+      // We'll explicitly exchange the reset code to avoid conflicts
+      detectSessionInUrl: false,
+    },
+  });
 }
 
 // Database types for type safety
