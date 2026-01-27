@@ -80,9 +80,40 @@ export const PRIORITY_CONFIG: Record<EventPriority, { label: string; color: stri
 
 export type ViewMode = 'month' | 'week';
 
+// Block-based note content types
+export type BlockType = 
+  | 'paragraph' 
+  | 'heading1' 
+  | 'heading2' 
+  | 'heading3' 
+  | 'bulletList' 
+  | 'numberedList' 
+  | 'checkbox' 
+  | 'code';
+
+export interface TextFormat {
+  bold?: boolean;
+  italic?: boolean;
+  code?: boolean;
+  link?: string;
+}
+
+export interface TextSegment {
+  text: string;
+  format?: TextFormat;
+}
+
+export interface ContentBlock {
+  id: string;
+  type: BlockType;
+  content: TextSegment[];
+  checked?: boolean; // for checkbox blocks
+}
+
 export interface Note {
   id: string;
-  content: string;
+  content: string; // JSON string containing ContentBlock[] or legacy plain text
+  title?: string; // Optional note title
   createdAt: string;
   updatedAt: string;
   pinned: boolean;

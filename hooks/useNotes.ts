@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Note } from '@/types';
+import { Note, ContentBlock } from '@/types';
 import { loadNotes, saveNotes } from '@/utils/storageUtils';
 import { createClient, DbNote } from '@/lib/supabase';
+import { 
+  parseContentToBlocks, 
+  serializeBlocks, 
+  isBlockBasedContent,
+  createBlock 
+} from '@/utils/noteBlocks';
 
 // Fields to encrypt in notes
 const ENCRYPTED_NOTE_FIELDS: (keyof Note)[] = ['content'];
@@ -15,6 +21,21 @@ function mapDbNoteToLocal(dbNote: DbNote): Note {
     updatedAt: dbNote.updated_at,
     pinned: dbNote.pinned,
     color: dbNote.color,
+  };
+}
+
+// Migrate legacy plain text notes to block format
+function migrateNoteToBlocks(note: Note): Note {
+  // If already block-based, return as-is
+  if (isBlockBasedContent(note.content)) {
+    return note;
+  }
+  
+  // Migrate plain text to blocks
+  const blocks = parseContentToBlocks(note.content);
+  return {
+    ...note,
+    content: serializeBlocks(blocks),
   };
 }
 
@@ -138,8 +159,10 @@ export function useNotes(options: UseNotesOptions = {}) {
         if (!error && data && isMounted) {
           const mappedNotes = data.map(mapDbNoteToLocal);
           const decryptedNotes = await decryptNotes(mappedNotes);
+          // Migrate legacy notes to block format
+          const migratedNotes = decryptedNotes.map(migrateNoteToBlocks);
           if (isMounted) {
-            setNotes(decryptedNotes);
+            setNotes(migratedNotes);
           }
         }
 
@@ -181,7 +204,10 @@ export function useNotes(options: UseNotesOptions = {}) {
       } else {
         // Fallback to localStorage for unauthenticated users
         if (isMounted) {
-          setNotes(loadNotes());
+          const localNotes = loadNotes();
+          // Migrate legacy notes to block format
+          const migratedNotes = localNotes.map(migrateNoteToBlocks);
+          setNotes(migratedNotes);
         }
       }
 
@@ -200,14 +226,30 @@ export function useNotes(options: UseNotesOptions = {}) {
     };
   }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote]);
 
-  const addNote = useCallback(async (content: string, color: string | null = null) => {
+  const addNote = useCallback(async (
+    content: string | ContentBlock[], 
+    color: string | null = null,
+    title?: string
+  ) => {
     const supabase = supabaseRef.current;
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
 
+    // Handle both string content (legacy) and block array
+    let contentString: string;
+    if (typeof content === 'string') {
+      // Legacy: convert string to blocks
+      const blocks = parseContentToBlocks(content);
+      contentString = serializeBlocks(blocks);
+    } else {
+      // Block array: serialize directly
+      contentString = serializeBlocks(content);
+    }
+
     const newNote: Note = {
       id,
-      content,
+      content: contentString,
+      title,
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -264,15 +306,29 @@ export function useNotes(options: UseNotesOptions = {}) {
     return newNote;
   }, [userId, notes, encryptNote]);
 
-  const updateNote = useCallback(async (noteId: string, content: string) => {
+  const updateNote = useCallback(async (
+    noteId: string, 
+    content: string | ContentBlock[]
+  ) => {
     const supabase = supabaseRef.current;
     const now = new Date().toISOString();
+
+    // Handle both string content (legacy) and block array
+    let contentString: string;
+    if (typeof content === 'string') {
+      // If legacy plain text, migrate to blocks
+      const blocks = parseContentToBlocks(content);
+      contentString = serializeBlocks(blocks);
+    } else {
+      // Block array: serialize directly
+      contentString = serializeBlocks(content);
+    }
 
     // Optimistically update UI immediately
     setNotes(prev =>
       prev.map(note =>
         note.id === noteId
-          ? { ...note, content, updatedAt: now }
+          ? { ...note, content: contentString, updatedAt: now }
           : note
       )
     );
@@ -299,7 +355,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         try {
           // Get current content from state (may have changed during debounce)
           const currentNote = notes.find(n => n.id === noteId);
-          const contentToSave = currentNote?.content || content;
+          const contentToSave = currentNote?.content || contentString;
           
           // Encrypt content before saving
           const encryptedContent = encryption?.isUnlocked 
@@ -334,7 +390,7 @@ export function useNotes(options: UseNotesOptions = {}) {
       // localStorage fallback - save immediately
       const updatedNotes = notes.map(note =>
         note.id === noteId
-          ? { ...note, content, updatedAt: now }
+          ? { ...note, content: contentString, updatedAt: now }
           : note
       );
       setNotes(updatedNotes);
@@ -509,6 +565,82 @@ export function useNotes(options: UseNotesOptions = {}) {
     }
   }, [userId, notes]);
 
+  // Update note title
+  const updateNoteTitle = useCallback(async (noteId: string, title: string) => {
+    const supabase = supabaseRef.current;
+    const now = new Date().toISOString();
+
+    // Optimistically update UI immediately
+    setNotes(prev =>
+      prev.map(note =>
+        note.id === noteId
+          ? { ...note, title, updatedAt: now }
+          : note
+      )
+    );
+
+    if (userId) {
+      // Clear existing debounce timer for this note
+      const existingTimer = debounceTimersRef.current.get(`title-${noteId}`);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      // Debounce rapid sequential updates (300ms)
+      const timer = setTimeout(async () => {
+        debounceTimersRef.current.delete(`title-${noteId}`);
+        
+        const opKey = `title-${noteId}`;
+        if (pendingOpsRef.current.has(opKey)) return;
+        
+        pendingOpsRef.current.add(opKey);
+        setSyncing(true);
+        
+        try {
+          const currentNote = notes.find(n => n.id === noteId);
+          const titleToSave = currentNote?.title ?? title;
+          
+          const { error } = await supabase
+            .from('notes')
+            .update({
+              // Note: title field doesn't exist in DB yet, but we'll store it in content metadata
+              // For now, we'll need to handle this differently or add title column
+              // This is a placeholder for future DB schema update
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', noteId)
+            .eq('user_id', userId);
+
+          if (error) {
+            console.error('Failed to update note title:', error);
+          }
+        } catch (error) {
+          console.error('Error updating note title:', error);
+        } finally {
+          pendingOpsRef.current.delete(opKey);
+          setSyncing(pendingOpsRef.current.size > 0);
+        }
+      }, 300);
+
+      debounceTimersRef.current.set(`title-${noteId}`, timer);
+    } else {
+      // localStorage fallback
+      const updatedNotes = notes.map(note =>
+        note.id === noteId
+          ? { ...note, title, updatedAt: now }
+          : note
+      );
+      setNotes(updatedNotes);
+      saveNotes(updatedNotes);
+    }
+  }, [userId, notes]);
+
+  // Update note blocks directly
+  const updateNoteBlocks = useCallback(async (noteId: string, blocks: ContentBlock[]) => {
+    const contentString = serializeBlocks(blocks);
+    await updateNote(noteId, contentString);
+  }, [updateNote]);
+
   // Sort notes: pinned first, then by updated date
   const sortedNotes = [...notes].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -519,6 +651,8 @@ export function useNotes(options: UseNotesOptions = {}) {
     notes: sortedNotes,
     addNote,
     updateNote,
+    updateNoteTitle,
+    updateNoteBlocks,
     deleteNote,
     togglePinNote,
     setNoteColor,

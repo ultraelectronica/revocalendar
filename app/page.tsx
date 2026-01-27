@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
 import FloatingLines from '@/components/FloatingLines';
 import UpcomingPlans from '@/components/UpcomingPlans';
-import NotesSection from '@/components/NotesSection';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
 import FocusTimer from '@/components/FocusTimer';
@@ -277,12 +277,12 @@ function UserMenu() {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [nav, setNav] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isEventListOpen, setIsEventListOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<'plans' | 'notes'>('plans');
   const [showMobileStats, setShowMobileStats] = useState(false);
   const [showEncryptionModal, setShowEncryptionModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -694,30 +694,19 @@ export default function Home() {
 
             {/* Right Sidebar - Plans & Notes */}
             <aside className="w-full lg:w-80 flex-shrink-0 flex flex-col gap-3 sm:gap-4 lg:gap-5">
-              {/* Tab Switcher */}
+              {/* Plans Header */}
               <div className="glass-card p-1 flex">
-                <button
-                  onClick={() => setSidebarTab('plans')}
-                  className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
-                    sidebarTab === 'plans'
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white border border-white/10'
-                      : 'text-white/50 hover:text-white'
-                  }`}
-                >
+                <div className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white border border-white/10">
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     Plans
                   </span>
-                </button>
+                </div>
                 <button
-                  onClick={() => setSidebarTab('notes')}
-                  className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
-                    sidebarTab === 'notes'
-                      ? 'bg-gradient-to-r from-orange-500/20 to-pink-500/20 text-white border border-white/10'
-                      : 'text-white/50 hover:text-white'
-                  }`}
+                  onClick={() => router.push('/notes')}
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 text-white/50 hover:text-white hover:bg-white/5"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -730,23 +719,13 @@ export default function Home() {
 
               {/* Content */}
               <div className="glass-card p-3 sm:p-4 flex-1 min-h-[300px] lg:min-h-0 overflow-hidden">
-                {sidebarTab === 'plans' ? (
-                  <div className="h-full max-h-[400px] lg:max-h-none overflow-y-auto pr-1">
-              <UpcomingPlans
-                      groupedEvents={groupedUpcomingEvents}
-                onEventClick={handleEditEvent}
-                      onToggleComplete={toggleEventCompletion}
-              />
-            </div>
-                ) : (
-            <NotesSection
-              notes={notes}
-                    onAddNote={addNote}
-                    onUpdateNote={updateNote}
-                    onDeleteNote={deleteNote}
-                    onTogglePin={togglePinNote}
+                <div className="h-full max-h-[400px] lg:max-h-none overflow-y-auto pr-1">
+                  <UpcomingPlans
+                    groupedEvents={groupedUpcomingEvents}
+                    onEventClick={handleEditEvent}
+                    onToggleComplete={toggleEventCompletion}
                   />
-                )}
+                </div>
               </div>
 
               {/* Keyboard Shortcuts Hint - Desktop only */}
