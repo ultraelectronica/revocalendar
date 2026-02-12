@@ -113,45 +113,52 @@ export function useNotes(options: UseNotesOptions = {}) {
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
     if (hasMigratedRef.current) return;
     
-    const supabase = supabaseRef.current;
-    
-    // Check if user already has notes in Supabase
-    const { count } = await supabase
-      .from('notes')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', uid);
-
-    if (count && count > 0) {
-      hasMigratedRef.current = true;
-      return;
-    }
-
-    // Load from localStorage
-    const localNotes = loadNotes();
-    
-    if (localNotes.length > 0) {
-      // Encrypt notes before migrating
-      const encryptedNotes = await Promise.all(
-        localNotes.map(async (n) => {
-          const encrypted = await encryptNote(n);
-          return {
-            id: n.id,
-            user_id: uid,
-            content: encrypted.content,
-            title: n.title ?? 'Untitled',
-            pinned: n.pinned,
-            color: n.color,
-            created_at: n.createdAt,
-            updated_at: n.updatedAt,
-          };
-        })
-      );
+    try {
+      const supabase = supabaseRef.current;
       
-      await supabase.from('notes').insert(encryptedNotes);
-      console.log(`Migrated ${localNotes.length} notes to Supabase`);
+      // Check if user already has notes in Supabase
+      const { count } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', uid);
+
+      if (count && count > 0) {
+        hasMigratedRef.current = true;
+        return;
+      }
+
+      // Load from localStorage
+      const localNotes = loadNotes();
+      
+      if (localNotes.length > 0) {
+        // Encrypt notes before migrating
+        const encryptedNotes = await Promise.all(
+          localNotes.map(async (n) => {
+            const encrypted = await encryptNote(n);
+            return {
+              id: n.id,
+              user_id: uid,
+              content: encrypted.content,
+              title: n.title ?? 'Untitled',
+              pinned: n.pinned,
+              color: n.color,
+              created_at: n.createdAt,
+              updated_at: n.updatedAt,
+            };
+          })
+        );
+        
+        await supabase.from('notes').insert(encryptedNotes);
+        console.log(`Migrated ${localNotes.length} notes to Supabase`);
+      }
+      
+      hasMigratedRef.current = true;
+    } catch (error) {
+      // Ignore AbortErrors - they're expected when component unmounts during operations
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error migrating notes:', error);
+      }
     }
-    
-    hasMigratedRef.current = true;
   }, [encryptNote]);
 
   // Fetch notes from Supabase or localStorage
@@ -165,75 +172,109 @@ export function useNotes(options: UseNotesOptions = {}) {
       if (!isMounted) return;
       setLoading(true);
 
-      if (userId) {
-        // Migrate localStorage data if needed
-        await migrateLocalToSupabase(userId);
+      try {
+        if (userId) {
+          // Migrate localStorage data if needed
+          await migrateLocalToSupabase(userId);
 
-        // Fetch from Supabase
-        const { data, error } = await supabase
-          .from('notes')
-          .select('*')
-          .eq('user_id', userId)
-          .order('pinned', { ascending: false })
-          .order('updated_at', { ascending: false });
+          // Fetch from Supabase
+          const { data, error } = await supabase
+            .from('notes')
+            .select('*')
+            .eq('user_id', userId)
+            .order('pinned', { ascending: false })
+            .order('updated_at', { ascending: false });
 
-        if (!error && data && isMounted) {
-          const mappedNotes = data.map(mapDbNoteToLocal);
-          const decryptedNotes = await decryptNotes(mappedNotes);
-          // Migrate legacy notes to block format
-          const migratedNotes = decryptedNotes.map(migrateNoteToBlocks);
+          if (!error && data && isMounted) {
+            const mappedNotes = data.map(mapDbNoteToLocal);
+            const decryptedNotes = await decryptNotes(mappedNotes);
+            // Migrate legacy notes to block format
+            const migratedNotes = decryptedNotes.map(migrateNoteToBlocks);
+            if (isMounted) {
+              setNotes(migratedNotes);
+            }
+          } else if (error && isMounted) {
+            // If Supabase is misconfigured or unavailable, fall back to localStorage
+            console.error('Error fetching notes from Supabase, falling back to local storage:', error);
+            const localNotes = loadNotes();
+            const migratedNotes = localNotes.map(migrateNoteToBlocks);
+            setNotes(migratedNotes);
+          }
+
+          // Set up real-time subscription (best-effort)
+          try {
+            channel = supabase
+              .channel(`notes-${userId}`)
+              .on(
+                'postgres_changes',
+                {
+                  event: '*',
+                  schema: 'public',
+                  table: 'notes',
+                  filter: `user_id=eq.${userId}`,
+                },
+                async (payload) => {
+                  if (!isMounted) return;
+                  try {
+                    if (payload.eventType === 'INSERT') {
+                      const mapped = mapDbNoteToLocal(payload.new as DbNote);
+                      const decrypted = await decryptNote(mapped);
+                      if (isMounted) {
+                        setNotes(prev => [decrypted, ...prev]);
+                      }
+                    } else if (payload.eventType === 'UPDATE') {
+                      const mapped = mapDbNoteToLocal(payload.new as DbNote);
+                      const decrypted = await decryptNote(mapped);
+                      if (isMounted) {
+                        setNotes(prev =>
+                          prev.map(n => n.id === decrypted.id ? decrypted : n)
+                        );
+                      }
+                    } else if (payload.eventType === 'DELETE') {
+                      if (isMounted) {
+                        setNotes(prev => prev.filter(n => n.id !== (payload.old as DbNote).id));
+                      }
+                    }
+                  } catch (error) {
+                    // Ignore AbortErrors - they're expected when component unmounts
+                    if (error instanceof Error && error.name !== 'AbortError') {
+                      console.error('Error processing real-time update:', error);
+                    }
+                  }
+                }
+              )
+              .subscribe();
+          } catch (error) {
+            // Ignore AbortErrors during subscription setup
+            if (error instanceof Error && error.name !== 'AbortError') {
+              console.error('Error setting up real-time subscription:', error);
+            }
+          }
+        } else {
+          // Fallback to localStorage for unauthenticated users
           if (isMounted) {
+            const localNotes = loadNotes();
+            // Migrate legacy notes to block format
+            const migratedNotes = localNotes.map(migrateNoteToBlocks);
             setNotes(migratedNotes);
           }
         }
 
-        // Set up real-time subscription
-        channel = supabase
-          .channel(`notes-${userId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'notes',
-              filter: `user_id=eq.${userId}`,
-            },
-            async (payload) => {
-              if (!isMounted) return;
-              if (payload.eventType === 'INSERT') {
-                const mapped = mapDbNoteToLocal(payload.new as DbNote);
-                const decrypted = await decryptNote(mapped);
-                if (isMounted) {
-                  setNotes(prev => [decrypted, ...prev]);
-                }
-              } else if (payload.eventType === 'UPDATE') {
-                const mapped = mapDbNoteToLocal(payload.new as DbNote);
-                const decrypted = await decryptNote(mapped);
-                if (isMounted) {
-                  setNotes(prev =>
-                    prev.map(n => n.id === decrypted.id ? decrypted : n)
-                  );
-                }
-              } else if (payload.eventType === 'DELETE') {
-                if (isMounted) {
-                  setNotes(prev => prev.filter(n => n.id !== (payload.old as DbNote).id));
-                }
-              }
-            }
-          )
-          .subscribe();
-      } else {
-        // Fallback to localStorage for unauthenticated users
         if (isMounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        // Ignore AbortErrors - they're expected when component unmounts during operations
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error fetching notes:', error);
+        }
+        if (isMounted) {
+          // As a last resort, attempt to show local notes so the user doesn't lose data
           const localNotes = loadNotes();
-          // Migrate legacy notes to block format
           const migratedNotes = localNotes.map(migrateNoteToBlocks);
           setNotes(migratedNotes);
+          setLoading(false);
         }
-      }
-
-      if (isMounted) {
-        setLoading(false);
       }
     };
 
@@ -242,7 +283,16 @@ export function useNotes(options: UseNotesOptions = {}) {
     return () => {
       isMounted = false;
       if (channel) {
-        supabase.removeChannel(channel);
+        try {
+          // Unsubscribe from channel before removing
+          channel.unsubscribe();
+          supabase.removeChannel(channel);
+        } catch (error) {
+          // Ignore AbortErrors - they're expected when component unmounts during auth operations
+          if (error instanceof Error && error.name !== 'AbortError') {
+            console.error('Error cleaning up channel:', error);
+          }
+        }
       }
     };
   }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote]);
@@ -397,13 +447,22 @@ export function useNotes(options: UseNotesOptions = {}) {
             .single();
 
           if (error) {
-            // Rollback on error
-            console.error('Failed to add note:', error);
-            setNotes(prev => prev.filter(n => n.id !== id));
+            // Do not remove the note from UI; fall back to local storage so the user keeps their data
+            console.error('Failed to add note to Supabase, keeping note locally:', error);
+            try {
+              saveNotes(notesRef.current);
+            } catch (e) {
+              console.error('Failed to persist note locally after Supabase error:', e);
+            }
           }
         } catch (error) {
           console.error('Error adding note:', error);
-          setNotes(prev => prev.filter(n => n.id !== id));
+          // Keep the note in UI and persist to local storage as a fallback
+          try {
+            saveNotes(notesRef.current);
+          } catch (e) {
+            console.error('Failed to persist note locally after unexpected error:', e);
+          }
         } finally {
           endOp(opKey);
         }

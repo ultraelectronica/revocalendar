@@ -212,6 +212,16 @@ export function useAuthProvider() {
           await handleInitialSession(null, 'direct-check-no-user');
         }
       } catch (e) {
+        // Supabase's auth internals sometimes abort requests when cleaning up locks.
+        // Treat AbortError as a benign, expected case and don't log it as an error.
+        if (e instanceof Error && e.name === 'AbortError') {
+          console.warn('[Auth] Fallback session check was aborted (expected during cleanup).');
+          if (!hasInitialized && isMounted) {
+            await handleInitialSession(null, 'fallback-abort');
+          }
+          return;
+        }
+
         console.error('[Auth] Error in fallback session check:', e);
         if (!hasInitialized && isMounted) {
           await handleInitialSession(null, 'fallback-error');

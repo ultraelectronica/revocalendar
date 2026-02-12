@@ -210,24 +210,6 @@ export default function NoteEditor({
     if (isEditing) {
       return (
         <div key={block.id} className={styleClasses}>
-          <div className="flex flex-wrap items-center gap-1 mb-1">
-            <button
-              type="button"
-              onClick={() => toggleEditFormat('bold')}
-              className={`p-1.5 rounded text-sm font-medium transition-colors ${editFormat?.bold ? 'bg-cyan-500/30 text-cyan-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
-              title="Bold"
-            >
-              B
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleEditFormat('italic')}
-              className={`p-1.5 rounded text-sm italic transition-colors ${editFormat?.italic ? 'bg-cyan-500/30 text-cyan-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
-              title="Italic"
-            >
-              I
-            </button>
-          </div>
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
@@ -329,53 +311,8 @@ export default function NoteEditor({
     }
 
     return (
-      <div key={block.id} className={`group relative ${styleClasses}`}>
+      <div key={block.id} className={styleClasses}>
         {content}
-        <div className="absolute left-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-8 flex flex-wrap gap-1">
-          {(['left', 'center', 'right'] as const).map((align) => (
-            <button
-              key={align}
-              type="button"
-              onClick={() => handleUpdateBlockStyle(block.id, { align })}
-              className={`p-1 rounded text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.align === align ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
-              title={`Align ${align}`}
-            >
-              {align === 'left' ? 'L' : align === 'center' ? 'C' : 'R'}
-            </button>
-          ))}
-          {(['tight', 'normal', 'relaxed'] as const).map((spacing) => (
-            <button
-              key={spacing}
-              type="button"
-              onClick={() => handleUpdateBlockStyle(block.id, { spacing })}
-              className={`p-1 rounded text-[10px] text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.spacing === spacing ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
-              title={`Line spacing: ${spacing}`}
-            >
-              {spacing === 'tight' ? 'T' : spacing === 'normal' ? 'N' : 'R'}
-            </button>
-          ))}
-          {(['none', 'small', 'medium', 'large'] as const).map((margin) => (
-            <button
-              key={margin}
-              type="button"
-              onClick={() => handleUpdateBlockStyle(block.id, { margin })}
-              className={`p-1 rounded text-[10px] text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.margin === margin ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
-              title={`Margin: ${margin}`}
-            >
-              M{margin === 'none' ? '0' : margin === 'small' ? '1' : margin === 'medium' ? '2' : '3'}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => handleDeleteBlock(block.id)}
-            className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-white/10 transition-all"
-            title="Delete block"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
       </div>
     );
   };
@@ -389,8 +326,8 @@ export default function NoteEditor({
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="border-b border-white/10 bg-[#0a0a12]/80 backdrop-blur-sm p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Color Picker */}
             <div className="flex gap-1">
               {colors.map((color) => (
@@ -406,8 +343,84 @@ export default function NoteEditor({
                 />
               ))}
             </div>
+            {/* Block format: only when a block is being edited */}
+            {editingBlockId && (() => {
+              const block = blocks.find((b) => b.id === editingBlockId);
+              if (!block) return null;
+              const btn = 'p-1.5 rounded text-white/60 hover:text-cyan-300 hover:bg-white/10 transition-all text-sm';
+              const btnActive = 'bg-cyan-500/20 text-cyan-300';
+              return (
+                <div
+                  className="flex items-center gap-0.5 border-l border-white/10 pl-2 ml-1"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleEditFormat('bold')}
+                    className={`${btn} font-bold ${editFormat?.bold ? btnActive : ''}`}
+                    title="Bold"
+                  >
+                    B
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleEditFormat('italic')}
+                    className={`${btn} italic ${editFormat?.italic ? btnActive : ''}`}
+                    title="Italic"
+                  >
+                    I
+                  </button>
+                  <span className="w-px h-4 bg-white/10 mx-0.5" aria-hidden />
+                  {(['left', 'center', 'right'] as const).map((align) => (
+                    <button
+                      key={align}
+                      type="button"
+                      onClick={() => handleUpdateBlockStyle(block.id, { align })}
+                      className={`${btn} ${block.style?.align === align ? btnActive : ''}`}
+                      title={`Align ${align}`}
+                    >
+                      {align === 'left' ? 'L' : align === 'center' ? 'C' : 'R'}
+                    </button>
+                  ))}
+                  <span className="w-px h-4 bg-white/10 mx-0.5" aria-hidden />
+                  {(['tight', 'normal', 'relaxed'] as const).map((spacing) => (
+                    <button
+                      key={spacing}
+                      type="button"
+                      onClick={() => handleUpdateBlockStyle(block.id, { spacing })}
+                      className={`${btn} text-xs ${block.style?.spacing === spacing ? btnActive : ''}`}
+                      title={`Line spacing: ${spacing}`}
+                    >
+                      {spacing === 'tight' ? 'T' : spacing === 'normal' ? 'N' : 'R'}
+                    </button>
+                  ))}
+                  {(['none', 'small', 'medium', 'large'] as const).map((margin) => (
+                    <button
+                      key={margin}
+                      type="button"
+                      onClick={() => handleUpdateBlockStyle(block.id, { margin })}
+                      className={`${btn} text-xs ${block.style?.margin === margin ? btnActive : ''}`}
+                      title={`Margin: ${margin}`}
+                    >
+                      M{margin === 'none' ? '0' : margin === 'small' ? '1' : margin === 'medium' ? '2' : '3'}
+                    </button>
+                  ))}
+                  <span className="w-px h-4 bg-white/10 mx-0.5" aria-hidden />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBlock(block.id)}
+                    className={`${btn} hover:text-red-400`}
+                    title="Delete block"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={handleSave}
