@@ -21,6 +21,7 @@ interface NoteEditorProps {
   onTogglePin: (noteId: string) => Promise<void>;
   onSetColor: (noteId: string, color: string | null) => Promise<void>;
   colors: Array<{ value: string | null; label: string; class: string }>;
+  onClose?: () => void;
 }
 
 export default function NoteEditor({
@@ -33,6 +34,7 @@ export default function NoteEditor({
   onTogglePin,
   onSetColor,
   colors,
+  onClose,
 }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title || '');
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => parseContentToBlocks(note.content));
@@ -328,6 +330,19 @@ export default function NoteEditor({
       <div className="border-b border-white/10 bg-[#0a0a12]/80 backdrop-blur-sm p-3 sm:p-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Mobile Back Button */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="sm:hidden p-2 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all mr-2"
+                title="Back to list"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+            )}
+            
             {/* Color Picker */}
             <div className="flex gap-1">
               {colors.map((color) => (

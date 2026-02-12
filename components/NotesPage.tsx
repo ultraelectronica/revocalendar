@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Note, ContentBlock } from '@/types';
 import { parseContentToBlocks, createBlock, serializeBlocks } from '@/utils/noteBlocks';
@@ -45,6 +45,8 @@ export default function NotesPage({
 }: NotesPageProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Track when user explicitly closed the editor (back/drag) - don't auto-select in that case
+  const [userClosedEditor, setUserClosedEditor] = useState(false);
 
   // Get selected note
   const selectedNote = useMemo(() => {
@@ -64,16 +66,17 @@ export default function NotesPage({
     });
   }, [notes, searchQuery]);
 
-  // Auto-select first note if none selected
+  // Auto-select first note only on initial load — not when user explicitly closed via back/drag
   useMemo(() => {
-    if (!selectedNoteId && filteredNotes.length > 0) {
+    if (!userClosedEditor && !selectedNoteId && filteredNotes.length > 0) {
       setSelectedNoteId(filteredNotes[0].id);
     }
-  }, [filteredNotes, selectedNoteId]);
+  }, [filteredNotes, selectedNoteId, userClosedEditor]);
 
   const handleCreateNote = async () => {
     const newBlock = createBlock('paragraph', '');
     const newNote = await onAddNote([newBlock], null);
+    setUserClosedEditor(false);
     setSelectedNoteId(newNote.id);
   };
 
@@ -84,6 +87,71 @@ export default function NotesPage({
       setSelectedNoteId(remainingNotes.length > 0 ? remainingNotes[0].id : null);
     }
   };
+  
+  // Mobile Drag Gesture State
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Only enable drag on mobile when a note is selected
+    if (!selectedNoteId) return;
+    
+    // Check if we're on a large screen (simple heuristic)
+    if (window.innerWidth >= 640) return;
+
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || touchStartX.current === null || touchStartY.current === null) return;
+    
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    
+    const diffX = currentX - touchStartX.current;
+    const diffY = currentY - touchStartY.current;
+
+    // Check for vertical scrolling intent
+    // If vertical movement is significant and greater than horizontal movement, cancel horizontal drag
+    if (Math.abs(diffY) > 10 && Math.abs(diffY) > Math.abs(diffX)) {
+      setIsDragging(false);
+      dragOffsetRef.current = 0;
+      setDragOffset(0);
+      return;
+    }
+
+    // Only allow dragging to the right (positive diffX) to reveal the list
+    if (diffX > 0) {
+      dragOffsetRef.current = diffX;
+      setDragOffset(diffX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    
+    setIsDragging(false);
+    touchStartX.current = null;
+    touchStartY.current = null;
+    
+    // Threshold to close: 30% of screen width. Use ref to avoid stale closure.
+    const threshold = window.innerWidth * 0.3;
+    const finalOffset = dragOffsetRef.current;
+    
+    if (finalOffset > threshold) {
+      setUserClosedEditor(true);
+      setSelectedNoteId(null);
+    }
+    
+    // Reset offset
+    dragOffsetRef.current = 0;
+    setDragOffset(0);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a12] flex flex-col">
@@ -93,9 +161,24 @@ export default function NotesPage({
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo and Back Button */}
             <div className="flex items-center gap-3 sm:gap-4">
+              {/* Mobile Back Button (to List) */}
+              <button
+                onClick={() => {
+                  setUserClosedEditor(true);
+                  setSelectedNoteId(null);
+                }}
+                className={`sm:hidden flex items-center gap-2 text-white/80 hover:text-white transition-colors ${!selectedNoteId ? 'hidden' : ''}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="text-sm font-medium">Back</span>
+              </button>
+
+              {/* Desktop/Default Back Button (to Home) */}
               <Link 
                 href="/"
-                className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+                className={`flex items-center gap-2 text-white/80 hover:text-white transition-colors ${selectedNoteId ? 'hidden sm:flex' : ''}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -133,9 +216,12 @@ export default function NotesPage({
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Sidebar - Note List */}
-        <aside className="w-full sm:w-80 lg:w-96 border-r border-white/10 bg-[#0a0a12] flex flex-col">
+        <aside 
+          className="w-full sm:w-80 lg:w-96 border-r border-white/10 bg-[#0a0a12] flex flex-col absolute sm:static inset-0 z-0 sm:z-auto"
+        >
           {/* Search */}
           <div className="p-3 sm:p-4 border-b border-white/10">
             <div className="relative">
@@ -162,7 +248,10 @@ export default function NotesPage({
             <NoteList
               notes={filteredNotes}
               selectedNoteId={selectedNoteId}
-              onSelectNote={setSelectedNoteId}
+              onSelectNote={(id) => {
+                setUserClosedEditor(false);
+                setSelectedNoteId(id);
+              }}
               onDeleteNote={handleDeleteNote}
               onTogglePin={onTogglePin}
               onSetColor={onSetColor}
@@ -172,18 +261,36 @@ export default function NotesPage({
         </aside>
 
         {/* Main Editor Area */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#0a0a12]">
+        <main 
+          className={`
+            w-full sm:flex-1 flex flex-col overflow-hidden bg-[#0a0a12] 
+            absolute sm:static inset-0 z-10 sm:z-auto 
+            ${isDragging ? '' : 'transition-transform duration-300 ease-in-out'}
+            ${selectedNoteId ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'}
+          `}
+          style={{
+            transform: isDragging && selectedNoteId ? `translateX(${dragOffset}px)` : undefined,
+            touchAction: 'pan-y' // Allow vertical scrolling, handle horizontal in JS
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {selectedNote ? (
           <NoteEditor
               note={selectedNote}
               onUpdateNote={onUpdateNote}
               onUpdateNoteTitle={onUpdateNoteTitle}
               onUpdateNoteBlocks={onUpdateNoteBlocks}
-            onSaveNoteNow={onSaveNoteNow}
+              onSaveNoteNow={onSaveNoteNow}
               onDeleteNote={handleDeleteNote}
               onTogglePin={onTogglePin}
               onSetColor={onSetColor}
               colors={NOTE_COLORS}
+              onClose={() => {
+                setUserClosedEditor(true);
+                setSelectedNoteId(null);
+              }}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
