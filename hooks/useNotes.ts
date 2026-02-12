@@ -17,6 +17,7 @@ function mapDbNoteToLocal(dbNote: DbNote): Note {
   return {
     id: dbNote.id,
     content: dbNote.content,
+    title: dbNote.title ?? 'Untitled',
     createdAt: dbNote.created_at,
     updatedAt: dbNote.updated_at,
     pinned: dbNote.pinned,
@@ -59,6 +60,7 @@ export function useNotes(options: UseNotesOptions = {}) {
   const [syncing, setSyncing] = useState(false);
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
+  const notesRef = useRef<Note[]>([]);
   
   // Queue for pending database operations
   const pendingOpsRef = useRef<Set<string>>(new Set());
@@ -89,6 +91,24 @@ export function useNotes(options: UseNotesOptions = {}) {
     return Promise.all(notes.map(n => enc.decryptFields(n, ENCRYPTED_NOTE_FIELDS)));
   }, []);
 
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
+  const setSyncingFromPendingOps = useCallback(() => {
+    setSyncing(pendingOpsRef.current.size > 0);
+  }, []);
+
+  const beginOp = useCallback((opKey: string) => {
+    pendingOpsRef.current.add(opKey);
+    setSyncingFromPendingOps();
+  }, [setSyncingFromPendingOps]);
+
+  const endOp = useCallback((opKey: string) => {
+    pendingOpsRef.current.delete(opKey);
+    setSyncingFromPendingOps();
+  }, [setSyncingFromPendingOps]);
+
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
     if (hasMigratedRef.current) return;
@@ -118,6 +138,7 @@ export function useNotes(options: UseNotesOptions = {}) {
             id: n.id,
             user_id: uid,
             content: encrypted.content,
+            title: n.title ?? 'Untitled',
             pinned: n.pinned,
             color: n.color,
             created_at: n.createdAt,
@@ -226,6 +247,96 @@ export function useNotes(options: UseNotesOptions = {}) {
     };
   }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote]);
 
+  const saveNoteNow = useCallback(async (
+    noteId: string,
+    payload: { title?: string; blocks?: ContentBlock[]; content?: string }
+  ) => {
+    const supabase = supabaseRef.current;
+    const now = new Date().toISOString();
+
+    // Cancel any pending debounced saves for this note
+    const contentTimer = debounceTimersRef.current.get(noteId);
+    if (contentTimer) {
+      clearTimeout(contentTimer);
+      debounceTimersRef.current.delete(noteId);
+    }
+    const titleTimer = debounceTimersRef.current.get(`title-${noteId}`);
+    if (titleTimer) {
+      clearTimeout(titleTimer);
+      debounceTimersRef.current.delete(`title-${noteId}`);
+    }
+
+    const current = notesRef.current.find(n => n.id === noteId);
+    const titleToSave = payload.title ?? current?.title ?? 'Untitled';
+    const resolvedTitle = titleToSave.trim() ? titleToSave.trim() : 'Untitled';
+
+    let contentToSave: string | undefined;
+    if (payload.blocks) {
+      contentToSave = serializeBlocks(payload.blocks);
+    } else if (typeof payload.content === 'string') {
+      contentToSave = payload.content;
+    }
+
+    // Ensure we persist what's on-screen
+    setNotes(prev =>
+      prev.map(n =>
+        n.id === noteId
+          ? {
+              ...n,
+              ...(contentToSave !== undefined ? { content: contentToSave } : {}),
+              title: resolvedTitle,
+              updatedAt: now,
+            }
+          : n
+      )
+    );
+
+    if (!userId) {
+      const updated = notesRef.current.map(n =>
+        n.id === noteId
+          ? {
+              ...n,
+              ...(contentToSave !== undefined ? { content: contentToSave } : {}),
+              title: resolvedTitle,
+              updatedAt: now,
+            }
+          : n
+      );
+      saveNotes(updated);
+      return;
+    }
+
+    const opKey = `save-${noteId}`;
+    if (pendingOpsRef.current.has(opKey)) return;
+    beginOp(opKey);
+
+    try {
+      const updateData: Record<string, unknown> = {
+        title: resolvedTitle,
+        updated_at: now,
+      };
+
+      if (contentToSave !== undefined) {
+        const encryptedContent = encryption?.isUnlocked
+          ? await encryption.encrypt(contentToSave)
+          : contentToSave;
+        updateData.content = encryptedContent;
+      }
+
+      const { error } = await supabase
+        .from('notes')
+        .update(updateData)
+        .eq('id', noteId)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw error;
+      }
+    } finally {
+      endOp(opKey);
+    }
+  }, [userId, encryption, beginOp, endOp]);
+
   const addNote = useCallback(async (
     content: string | ContentBlock[], 
     color: string | null = null,
@@ -246,10 +357,11 @@ export function useNotes(options: UseNotesOptions = {}) {
       contentString = serializeBlocks(content);
     }
 
+    const resolvedTitle = (title?.trim()) ? title.trim() : 'Untitled';
     const newNote: Note = {
       id,
       content: contentString,
-      title,
+      title: resolvedTitle,
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -265,8 +377,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         const opKey = `add-${id}`;
         if (pendingOpsRef.current.has(opKey)) return;
         
-        pendingOpsRef.current.add(opKey);
-        setSyncing(true);
+        beginOp(opKey);
         
         try {
           // Encrypt before saving
@@ -278,6 +389,7 @@ export function useNotes(options: UseNotesOptions = {}) {
               id,
               user_id: userId,
               content: encryptedNote.content,
+              title: newNote.title,
               pinned: false,
               color,
             })
@@ -293,8 +405,7 @@ export function useNotes(options: UseNotesOptions = {}) {
           console.error('Error adding note:', error);
           setNotes(prev => prev.filter(n => n.id !== id));
         } finally {
-          pendingOpsRef.current.delete(opKey);
-          setSyncing(pendingOpsRef.current.size > 0);
+          endOp(opKey);
         }
       })();
     } else {
@@ -304,7 +415,7 @@ export function useNotes(options: UseNotesOptions = {}) {
     }
     
     return newNote;
-  }, [userId, notes, encryptNote]);
+  }, [userId, notes, encryptNote, beginOp, endOp]);
 
   const updateNote = useCallback(async (
     noteId: string, 
@@ -349,12 +460,11 @@ export function useNotes(options: UseNotesOptions = {}) {
           return;
         }
         
-        pendingOpsRef.current.add(noteId);
-        setSyncing(true);
+        beginOp(noteId);
         
         try {
           // Get current content from state (may have changed during debounce)
-          const currentNote = notes.find(n => n.id === noteId);
+          const currentNote = notesRef.current.find(n => n.id === noteId);
           const contentToSave = currentNote?.content || contentString;
           
           // Encrypt content before saving
@@ -380,8 +490,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         } catch (error) {
           console.error('Error updating note:', error);
         } finally {
-          pendingOpsRef.current.delete(noteId);
-          setSyncing(pendingOpsRef.current.size > 0);
+          endOp(noteId);
         }
       }, 300);
 
@@ -396,7 +505,7 @@ export function useNotes(options: UseNotesOptions = {}) {
       setNotes(updatedNotes);
       saveNotes(updatedNotes);
     }
-  }, [userId, notes, encryption]);
+  }, [userId, notes, encryption, beginOp, endOp]);
 
   const deleteNote = useCallback(async (noteId: string) => {
     const supabase = supabaseRef.current;
@@ -413,8 +522,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         const opKey = `delete-${noteId}`;
         if (pendingOpsRef.current.has(opKey)) return;
         
-        pendingOpsRef.current.add(opKey);
-        setSyncing(true);
+        beginOp(opKey);
         
         try {
           const { error } = await supabase
@@ -436,8 +544,7 @@ export function useNotes(options: UseNotesOptions = {}) {
             setNotes(prev => [...prev, noteToDelete]);
           }
         } finally {
-          pendingOpsRef.current.delete(opKey);
-          setSyncing(pendingOpsRef.current.size > 0);
+          endOp(opKey);
         }
       })();
     } else {
@@ -445,7 +552,7 @@ export function useNotes(options: UseNotesOptions = {}) {
       const updatedNotes = notes.filter(note => note.id !== noteId);
       saveNotes(updatedNotes);
     }
-  }, [userId, notes]);
+  }, [userId, notes, beginOp, endOp]);
 
   const togglePinNote = useCallback(async (noteId: string) => {
     const supabase = supabaseRef.current;
@@ -467,8 +574,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         const opKey = `pin-${noteId}`;
         if (pendingOpsRef.current.has(opKey)) return;
         
-        pendingOpsRef.current.add(opKey);
-        setSyncing(true);
+        beginOp(opKey);
         
         try {
           const { error } = await supabase
@@ -494,8 +600,7 @@ export function useNotes(options: UseNotesOptions = {}) {
             )
           );
         } finally {
-          pendingOpsRef.current.delete(opKey);
-          setSyncing(pendingOpsRef.current.size > 0);
+          endOp(opKey);
         }
       })();
     } else {
@@ -505,7 +610,7 @@ export function useNotes(options: UseNotesOptions = {}) {
       );
       saveNotes(updatedNotes);
     }
-  }, [userId, notes]);
+  }, [userId, notes, beginOp, endOp]);
 
   const setNoteColor = useCallback(async (noteId: string, color: string | null) => {
     const supabase = supabaseRef.current;
@@ -603,9 +708,7 @@ export function useNotes(options: UseNotesOptions = {}) {
           const { error } = await supabase
             .from('notes')
             .update({
-              // Note: title field doesn't exist in DB yet, but we'll store it in content metadata
-              // For now, we'll need to handle this differently or add title column
-              // This is a placeholder for future DB schema update
+              title: titleToSave ?? 'Untitled',
               updated_at: new Date().toISOString(),
             })
             .eq('id', noteId)
@@ -650,6 +753,7 @@ export function useNotes(options: UseNotesOptions = {}) {
   return {
     notes: sortedNotes,
     addNote,
+    saveNoteNow,
     updateNote,
     updateNoteTitle,
     updateNoteBlocks,

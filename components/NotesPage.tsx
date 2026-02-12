@@ -10,6 +10,7 @@ import NoteList from './NoteList';
 interface NotesPageProps {
   notes: Note[];
   onAddNote: (content: string | ContentBlock[], color?: string | null, title?: string) => Promise<Note>;
+  onSaveNoteNow: (noteId: string, payload: { title?: string; blocks?: ContentBlock[]; content?: string }) => Promise<void>;
   onUpdateNote: (noteId: string, content: string | ContentBlock[]) => Promise<void>;
   onUpdateNoteTitle: (noteId: string, title: string) => Promise<void>;
   onUpdateNoteBlocks: (noteId: string, blocks: ContentBlock[]) => Promise<void>;
@@ -32,6 +33,7 @@ const NOTE_COLORS = [
 export default function NotesPage({
   notes,
   onAddNote,
+  onSaveNoteNow,
   onUpdateNote,
   onUpdateNoteTitle,
   onUpdateNoteBlocks,
@@ -71,7 +73,7 @@ export default function NotesPage({
 
   const handleCreateNote = async () => {
     const newBlock = createBlock('paragraph', '');
-    const newNote = await onAddNote([newBlock], null, '');
+    const newNote = await onAddNote([newBlock], null);
     setSelectedNoteId(newNote.id);
   };
 
@@ -172,11 +174,12 @@ export default function NotesPage({
         {/* Main Editor Area */}
         <main className="flex-1 flex flex-col overflow-hidden bg-[#0a0a12]">
           {selectedNote ? (
-            <NoteEditor
+          <NoteEditor
               note={selectedNote}
               onUpdateNote={onUpdateNote}
               onUpdateNoteTitle={onUpdateNoteTitle}
               onUpdateNoteBlocks={onUpdateNoteBlocks}
+            onSaveNoteNow={onSaveNoteNow}
               onDeleteNote={handleDeleteNote}
               onTogglePin={onTogglePin}
               onSetColor={onSetColor}

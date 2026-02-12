@@ -41,6 +41,7 @@ export default function NotesRoute() {
   const { 
     notes, 
     addNote,
+    saveNoteNow,
     updateNote,
     updateNoteTitle,
     updateNoteBlocks,
@@ -69,6 +70,7 @@ export default function NotesRoute() {
     <NotesPage
       notes={notes}
       onAddNote={addNote}
+      onSaveNoteNow={saveNoteNow}
       onUpdateNote={updateNote}
       onUpdateNoteTitle={updateNoteTitle}
       onUpdateNoteBlocks={updateNoteBlocks}

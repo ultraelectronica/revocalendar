@@ -9,6 +9,7 @@ interface NoteEditorProps {
   onUpdateNote: (noteId: string, content: string | ContentBlock[]) => Promise<void>;
   onUpdateNoteTitle: (noteId: string, title: string) => Promise<void>;
   onUpdateNoteBlocks: (noteId: string, blocks: ContentBlock[]) => Promise<void>;
+  onSaveNoteNow: (noteId: string, payload: { title?: string; blocks?: ContentBlock[]; content?: string }) => Promise<void>;
   onDeleteNote: (noteId: string) => void;
   onTogglePin: (noteId: string) => Promise<void>;
   onSetColor: (noteId: string, color: string | null) => Promise<void>;
@@ -20,6 +21,7 @@ export default function NoteEditor({
   onUpdateNote,
   onUpdateNoteTitle,
   onUpdateNoteBlocks,
+  onSaveNoteNow,
   onDeleteNote,
   onTogglePin,
   onSetColor,
@@ -29,6 +31,8 @@ export default function NoteEditor({
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => parseContentToBlocks(note.content));
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Sync with note changes
@@ -62,6 +66,39 @@ export default function NoteEditor({
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
+  };
+
+  const getBlocksForSave = (): ContentBlock[] => {
+    if (!editingBlockId) return blocks;
+    return blocks.map(block =>
+      block.id === editingBlockId
+        ? { ...block, content: [{ text: editText, format: {} }] }
+        : block
+    );
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    const blocksToSave = getBlocksForSave();
+    const titleToSave = title;
+
+    try {
+      // Persist immediately (don't wait for debounce)
+      await onSaveNoteNow(note.id, { title: titleToSave, blocks: blocksToSave });
+
+      // Keep UI state consistent with what we saved
+      if (editingBlockId) {
+        setBlocks(blocksToSave);
+        setEditingBlockId(null);
+        setEditText('');
+      }
+    } catch {
+      setSaveError('Save failed. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleStartEdit = (block: ContentBlock) => {
@@ -292,6 +329,18 @@ export default function NoteEditor({
           
           <div className="flex items-center gap-2">
             <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`px-3 py-2 rounded-lg transition-all text-sm font-medium ${
+                isSaving
+                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                  : 'bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25'
+              }`}
+              title="Save"
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+            <button
               onClick={() => onTogglePin(note.id)}
               className={`p-2 rounded-lg transition-all ${
                 note.pinned 
@@ -319,6 +368,11 @@ export default function NoteEditor({
             </button>
           </div>
         </div>
+        {saveError && (
+          <div className="mt-2 text-xs text-red-300">
+            {saveError}
+          </div>
+        )}
       </div>
 
       {/* Editor Content */}
