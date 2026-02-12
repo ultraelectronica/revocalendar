@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Note, ContentBlock } from '@/types';
-import { parseContentToBlocks, serializeBlocks, createBlock, mergeTextSegments } from '@/utils/noteBlocks';
+import { Note, ContentBlock, TextSegment, BlockStyle } from '@/types';
+import {
+  parseContentToBlocks,
+  serializeBlocks,
+  createBlock,
+  mergeTextSegments,
+  getBlockStyleClasses,
+  getSegmentFormat,
+} from '@/utils/noteBlocks';
 
 interface NoteEditorProps {
   note: Note;
@@ -31,9 +38,35 @@ export default function NoteEditor({
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => parseContentToBlocks(note.content));
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [editFormat, setEditFormat] = useState<ContentBlock['content'][0]['format']>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const renderFormattedContent = (segments: TextSegment[]) =>
+    segments.map((seg, i) => {
+      const { text, format } = seg;
+      if (!text) return null;
+      const cls = [
+        format?.bold && 'font-bold',
+        format?.italic && 'italic',
+        format?.code && 'font-mono text-xs bg-white/10 px-1 rounded',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const content = format?.link ? (
+        <a href={format.link} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">
+          {text}
+        </a>
+      ) : (
+        text
+      );
+      return (
+        <span key={i} className={cls || undefined}>
+          {content}
+        </span>
+      );
+    });
 
   // Sync with note changes
   useEffect(() => {
@@ -72,7 +105,7 @@ export default function NoteEditor({
     if (!editingBlockId) return blocks;
     return blocks.map(block =>
       block.id === editingBlockId
-        ? { ...block, content: [{ text: editText, format: {} }] }
+        ? { ...block, content: [{ text: editText, format: editFormat ?? {} }] }
         : block
     );
   };
@@ -104,21 +137,36 @@ export default function NoteEditor({
   const handleStartEdit = (block: ContentBlock) => {
     setEditingBlockId(block.id);
     setEditText(mergeTextSegments(block.content));
+    setEditFormat(getSegmentFormat(block.content));
   };
 
   const handleSaveBlock = (blockId: string) => {
-    setBlocks(prev => prev.map(block => 
-      block.id === blockId
-        ? { ...block, content: [{ text: editText, format: {} }] }
-        : block
-    ));
+    setBlocks(prev =>
+      prev.map(block =>
+        block.id === blockId ? { ...block, content: [{ text: editText, format: editFormat ?? {} }] } : block
+      )
+    );
     setEditingBlockId(null);
     setEditText('');
+    setEditFormat({});
   };
 
   const handleCancelEdit = () => {
     setEditingBlockId(null);
     setEditText('');
+    setEditFormat({});
+  };
+
+  const handleUpdateBlockStyle = (blockId: string, styleUpdate: Partial<BlockStyle>) => {
+    setBlocks(prev =>
+      prev.map(block =>
+        block.id === blockId ? { ...block, style: { ...block.style, ...styleUpdate } } : block
+      )
+    );
+  };
+
+  const toggleEditFormat = (key: 'bold' | 'italic') => {
+    setEditFormat((f) => ({ ...f, [key]: !f?.[key] }));
   };
 
   const handleAddBlock = (afterBlockId?: string) => {
@@ -157,10 +205,29 @@ export default function NoteEditor({
   const renderBlock = (block: ContentBlock, index: number) => {
     const text = mergeTextSegments(block.content);
     const isEditing = editingBlockId === block.id;
+    const styleClasses = getBlockStyleClasses(block.style);
 
     if (isEditing) {
       return (
-        <div key={block.id} className="mb-2">
+        <div key={block.id} className={styleClasses}>
+          <div className="flex flex-wrap items-center gap-1 mb-1">
+            <button
+              type="button"
+              onClick={() => toggleEditFormat('bold')}
+              className={`p-1.5 rounded text-sm font-medium transition-colors ${editFormat?.bold ? 'bg-cyan-500/30 text-cyan-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleEditFormat('italic')}
+              className={`p-1.5 rounded text-sm italic transition-colors ${editFormat?.italic ? 'bg-cyan-500/30 text-cyan-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
+              title="Italic"
+            >
+              I
+            </button>
+          </div>
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
@@ -175,117 +242,131 @@ export default function NoteEditor({
               }
             }}
             autoFocus
-            className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm resize-none focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+            className={`w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm resize-none focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 ${editFormat?.bold ? 'font-bold' : ''} ${editFormat?.italic ? 'italic' : ''}`}
             rows={block.type === 'code' ? 4 : 2}
           />
         </div>
       );
     }
 
-    const baseClasses = 'text-white/90 text-sm leading-relaxed break-words p-2 rounded hover:bg-white/5 cursor-text';
-    
+    const baseClasses = 'text-white/90 text-sm break-words p-2 rounded hover:bg-white/5 cursor-text';
+    const formatted = block.content.length ? renderFormattedContent(block.content) : null;
+
     let content: JSX.Element;
     switch (block.type) {
       case 'heading1':
         content = (
-          <h1 
-            className={`${baseClasses} text-2xl font-bold`}
-            onClick={() => handleStartEdit(block)}
-          >
-            {text || 'Heading 1'}
+          <h1 className={`${baseClasses} text-2xl font-bold`} onClick={() => handleStartEdit(block)}>
+            {formatted || 'Heading 1'}
           </h1>
         );
         break;
       case 'heading2':
         content = (
-          <h2 
-            className={`${baseClasses} text-xl font-semibold`}
-            onClick={() => handleStartEdit(block)}
-          >
-            {text || 'Heading 2'}
+          <h2 className={`${baseClasses} text-xl font-semibold`} onClick={() => handleStartEdit(block)}>
+            {formatted || 'Heading 2'}
           </h2>
         );
         break;
       case 'heading3':
         content = (
-          <h3 
-            className={`${baseClasses} text-lg font-medium`}
-            onClick={() => handleStartEdit(block)}
-          >
-            {text || 'Heading 3'}
+          <h3 className={`${baseClasses} text-lg font-medium`} onClick={() => handleStartEdit(block)}>
+            {formatted || 'Heading 3'}
           </h3>
         );
         break;
       case 'bulletList':
         content = (
-          <div 
-            className={`${baseClasses} flex items-start gap-2`}
-            onClick={() => handleStartEdit(block)}
-          >
+          <div className={`${baseClasses} flex items-start gap-2`} onClick={() => handleStartEdit(block)}>
             <span className="text-white/60 mt-1">•</span>
-            <span className="flex-1">{text || 'List item'}</span>
+            <span className="flex-1">{formatted || 'List item'}</span>
           </div>
         );
         break;
       case 'numberedList':
         content = (
-          <div 
-            className={`${baseClasses} flex items-start gap-2`}
-            onClick={() => handleStartEdit(block)}
-          >
+          <div className={`${baseClasses} flex items-start gap-2`} onClick={() => handleStartEdit(block)}>
             <span className="text-white/60 mt-1 min-w-[1.5rem]">{index + 1}.</span>
-            <span className="flex-1">{text || 'List item'}</span>
+            <span className="flex-1">{formatted || 'List item'}</span>
           </div>
         );
         break;
       case 'checkbox':
         content = (
-          <div 
-            className={`${baseClasses} flex items-start gap-2`}
-            onClick={() => handleStartEdit(block)}
-          >
+          <div className={`${baseClasses} flex items-start gap-2`} onClick={() => handleStartEdit(block)}>
             <input
               type="checkbox"
               checked={block.checked || false}
               onChange={(e) => {
-                setBlocks(prev => prev.map(b => 
-                  b.id === block.id ? { ...b, checked: e.target.checked } : b
-                ));
+                setBlocks(prev =>
+                  prev.map((b) => (b.id === block.id ? { ...b, checked: e.target.checked } : b))
+                );
               }}
               className="mt-1 w-4 h-4 rounded border-white/30 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
             />
             <span className={`flex-1 ${block.checked ? 'line-through text-white/60' : ''}`}>
-              {text || 'Checkbox item'}
+              {formatted || 'Checkbox item'}
             </span>
           </div>
         );
         break;
       case 'code':
         content = (
-          <code 
+          <code
             className={`${baseClasses} block bg-white/10 font-mono text-xs`}
             onClick={() => handleStartEdit(block)}
           >
-            {text || 'Code block'}
+            {formatted || 'Code block'}
           </code>
         );
         break;
       default:
         content = (
-          <p 
-            className={baseClasses}
-            onClick={() => handleStartEdit(block)}
-          >
-            {text || 'Start typing...'}
+          <p className={baseClasses} onClick={() => handleStartEdit(block)}>
+            {formatted || 'Start typing...'}
           </p>
         );
     }
 
     return (
-      <div key={block.id} className="group relative">
+      <div key={block.id} className={`group relative ${styleClasses}`}>
         {content}
-        <div className="absolute left-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-8 flex gap-1">
+        <div className="absolute left-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-8 flex flex-wrap gap-1">
+          {(['left', 'center', 'right'] as const).map((align) => (
+            <button
+              key={align}
+              type="button"
+              onClick={() => handleUpdateBlockStyle(block.id, { align })}
+              className={`p-1 rounded text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.align === align ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
+              title={`Align ${align}`}
+            >
+              {align === 'left' ? 'L' : align === 'center' ? 'C' : 'R'}
+            </button>
+          ))}
+          {(['tight', 'normal', 'relaxed'] as const).map((spacing) => (
+            <button
+              key={spacing}
+              type="button"
+              onClick={() => handleUpdateBlockStyle(block.id, { spacing })}
+              className={`p-1 rounded text-[10px] text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.spacing === spacing ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
+              title={`Line spacing: ${spacing}`}
+            >
+              {spacing === 'tight' ? 'T' : spacing === 'normal' ? 'N' : 'R'}
+            </button>
+          ))}
+          {(['none', 'small', 'medium', 'large'] as const).map((margin) => (
+            <button
+              key={margin}
+              type="button"
+              onClick={() => handleUpdateBlockStyle(block.id, { margin })}
+              className={`p-1 rounded text-[10px] text-white/40 hover:text-cyan-300 hover:bg-white/10 transition-all ${block.style?.margin === margin ? 'bg-cyan-500/20 text-cyan-300' : ''}`}
+              title={`Margin: ${margin}`}
+            >
+              M{margin === 'none' ? '0' : margin === 'small' ? '1' : margin === 'medium' ? '2' : '3'}
+            </button>
+          ))}
           <button
+            type="button"
             onClick={() => handleDeleteBlock(block.id)}
             className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-white/10 transition-all"
             title="Delete block"

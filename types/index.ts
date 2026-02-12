@@ -103,11 +103,27 @@ export interface TextSegment {
   format?: TextFormat;
 }
 
+/** Block-level text alignment */
+export type BlockTextAlign = 'left' | 'center' | 'right';
+
+/** Block-level line spacing */
+export type BlockSpacing = 'tight' | 'normal' | 'relaxed';
+
+/** Block-level bottom margin */
+export type BlockMargin = 'none' | 'small' | 'medium' | 'large';
+
+export interface BlockStyle {
+  align?: BlockTextAlign;
+  spacing?: BlockSpacing;
+  margin?: BlockMargin;
+}
+
 export interface ContentBlock {
   id: string;
   type: BlockType;
   content: TextSegment[];
   checked?: boolean; // for checkbox blocks
+  style?: BlockStyle;
 }
 
 export interface Note {

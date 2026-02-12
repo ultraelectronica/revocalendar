@@ -1,4 +1,4 @@
-import { BlockType, ContentBlock, TextSegment } from '@/types';
+import { BlockType, ContentBlock, TextSegment, BlockStyle, TextFormat } from '@/types';
 
 /**
  * Check if a string is valid JSON
@@ -164,7 +164,40 @@ export function serializeBlocks(blocks: ContentBlock[]): string {
  * Simple implementation - returns single segment for now (can be enhanced later)
  */
 export function parseInlineFormatting(text: string): TextSegment[] {
-  // For now, return simple text segment
-  // Full markdown parsing can be added later if needed
   return [{ text }];
+}
+
+/** Tailwind classes for block style (align, spacing, margin). Single source of truth. */
+const ALIGN_CLASSES: Record<NonNullable<BlockStyle['align']>, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+};
+
+const SPACING_CLASSES: Record<NonNullable<BlockStyle['spacing']>, string> = {
+  tight: 'leading-tight',
+  normal: 'leading-normal',
+  relaxed: 'leading-relaxed',
+};
+
+const MARGIN_CLASSES: Record<NonNullable<BlockStyle['margin']>, string> = {
+  none: 'mb-0',
+  small: 'mb-1',
+  medium: 'mb-2',
+  large: 'mb-4',
+};
+
+export function getBlockStyleClasses(style?: BlockStyle | null): string {
+  if (!style) return [SPACING_CLASSES.normal, MARGIN_CLASSES.small].join(' ');
+  const parts: string[] = [];
+  if (style.align) parts.push(ALIGN_CLASSES[style.align]);
+  parts.push(style.spacing ? SPACING_CLASSES[style.spacing] : SPACING_CLASSES.normal);
+  parts.push(style.margin !== undefined ? MARGIN_CLASSES[style.margin] : MARGIN_CLASSES.small);
+  return parts.join(' ');
+}
+
+/** Format from first segment (for block-level bold/italic when editing). */
+export function getSegmentFormat(segments: TextSegment[]): TextFormat {
+  const first = segments.find((s) => s.format && Object.keys(s.format).length > 0);
+  return first?.format ?? {};
 }
