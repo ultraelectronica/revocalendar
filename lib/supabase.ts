@@ -67,6 +67,7 @@ export interface DbNote {
   id: string;
   user_id: string;
   content: string;
+  title: string; // text, default 'Untitled'
   pinned: boolean;
   color: string | null;
   created_at: string;

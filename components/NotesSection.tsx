@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Note } from '@/types';
+import { Note, ContentBlock } from '@/types';
+import { parseContentToBlocks, mergeTextSegments, blocksToPlainText } from '@/utils/noteBlocks';
 
 interface NotesSectionProps {
   notes: Note[];
@@ -50,7 +51,9 @@ export default function NotesSection({
 
   const handleStartEdit = (note: Note) => {
     setEditingNoteId(note.id);
-    setEditContent(note.content);
+    // Convert blocks to plain text for editing (simple approach)
+    const blocks = parseContentToBlocks(note.content);
+    setEditContent(blocksToPlainText(blocks));
   };
 
   const handleSaveEdit = () => {
@@ -90,6 +93,92 @@ export default function NotesSection({
   const getColorClass = (color: string | null) => {
     const colorConfig = NOTE_COLORS.find(c => c.value === color);
     return colorConfig?.class || 'bg-white/5';
+  };
+
+  // Render a single block
+  const renderBlock = (block: ContentBlock, index: number) => {
+    const text = mergeTextSegments(block.content);
+    const baseClasses = 'text-white/90 text-xs sm:text-sm leading-relaxed break-words';
+    
+    switch (block.type) {
+      case 'heading1':
+        return (
+          <h1 key={block.id} className={`${baseClasses} text-lg sm:text-xl font-bold mb-2 mt-${index === 0 ? '0' : '4'}`}>
+            {text}
+          </h1>
+        );
+      case 'heading2':
+        return (
+          <h2 key={block.id} className={`${baseClasses} text-base sm:text-lg font-semibold mb-2 mt-${index === 0 ? '0' : '3'}`}>
+            {text}
+          </h2>
+        );
+      case 'heading3':
+        return (
+          <h3 key={block.id} className={`${baseClasses} text-sm sm:text-base font-medium mb-1 mt-${index === 0 ? '0' : '2'}`}>
+            {text}
+          </h3>
+        );
+      case 'bulletList':
+        return (
+          <div key={block.id} className={`${baseClasses} flex items-start gap-2 ${index > 0 ? 'mt-1' : ''}`}>
+            <span className="text-white/60 mt-1">•</span>
+            <span>{text}</span>
+          </div>
+        );
+      case 'numberedList':
+        return (
+          <div key={block.id} className={`${baseClasses} flex items-start gap-2 ${index > 0 ? 'mt-1' : ''}`}>
+            <span className="text-white/60 mt-1 min-w-[1.5rem]">•</span>
+            <span>{text}</span>
+          </div>
+        );
+      case 'checkbox':
+        return (
+          <div key={block.id} className={`${baseClasses} flex items-start gap-2 ${index > 0 ? 'mt-1' : ''}`}>
+            <input
+              type="checkbox"
+              checked={block.checked || false}
+              readOnly
+              className="mt-1 w-4 h-4 rounded border-white/30 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
+            />
+            <span className={block.checked ? 'line-through text-white/60' : ''}>{text}</span>
+          </div>
+        );
+      case 'code':
+        return (
+          <code key={block.id} className={`${baseClasses} block bg-white/10 px-2 py-1 rounded font-mono text-[10px] sm:text-xs ${index > 0 ? 'mt-2' : ''}`}>
+            {text}
+          </code>
+        );
+      case 'paragraph':
+      default:
+        return (
+          <p key={block.id} className={`${baseClasses} ${index > 0 ? 'mt-2' : ''}`}>
+            {text || '\u00A0'}
+          </p>
+        );
+    }
+  };
+
+  // Render note content as blocks
+  const renderNoteContent = (note: Note) => {
+    const blocks = parseContentToBlocks(note.content);
+    
+    if (blocks.length === 0) {
+      return <p className="text-white/40 text-xs sm:text-sm italic">Empty note</p>;
+    }
+
+    return (
+      <div className="space-y-1">
+        {note.title && (
+          <h2 className="text-white/90 text-base sm:text-lg font-semibold mb-2">
+            {note.title}
+          </h2>
+        )}
+        {blocks.map((block, index) => renderBlock(block, index))}
+      </div>
+    );
   };
 
   return (
@@ -226,9 +315,7 @@ export default function NotesSection({
                     </div>
                   )}
 
-                  <p className="text-white/90 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
-                    {note.content}
-                  </p>
+                  {renderNoteContent(note)}
 
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10">

@@ -66,6 +66,10 @@ export function useEvents(options: UseEventsOptions = {}) {
   const [syncing, setSyncing] = useState(false);
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
+  
+  // Queue for pending database operations
+  const pendingOpsRef = useRef<Set<string>>(new Set());
+  const debounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Use ref for encryption to avoid dependency changes triggering refetch
   const encryptionRef = useRef(encryption);
@@ -221,109 +225,187 @@ export function useEvents(options: UseEventsOptions = {}) {
   const addEvent = useCallback(async (event: CalendarEvent) => {
     const supabase = supabaseRef.current;
 
-    if (userId) {
-      setSyncing(true);
-      
-      // Encrypt before saving
-      const encryptedEvent = await encryptEvent(event);
-      
-      const { data, error } = await supabase
-        .from('events')
-        .insert({
-          ...mapLocalEventToDb(encryptedEvent, userId),
-          id: event.id,
-        })
-        .select()
-        .single();
+    // Optimistically add to UI immediately
+    setEvents(prev => [...prev, event]);
 
-      if (!error && data) {
-        // Add the original (unencrypted) event to local state
-        setEvents(prev => [...prev, event]);
-      }
-      setSyncing(false);
+    if (userId) {
+      // Save to database in background (non-blocking)
+      (async () => {
+        const opKey = `add-${event.id}`;
+        if (pendingOpsRef.current.has(opKey)) return;
+        
+        pendingOpsRef.current.add(opKey);
+        setSyncing(true);
+        
+        try {
+          // Encrypt before saving
+          const encryptedEvent = await encryptEvent(event);
+          
+          const { error } = await supabase
+            .from('events')
+            .insert({
+              ...mapLocalEventToDb(encryptedEvent, userId),
+              id: event.id,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            // Rollback on error
+            console.error('Failed to add event:', error);
+            setEvents(prev => prev.filter(e => e.id !== event.id));
+          }
+        } catch (error) {
+          console.error('Error adding event:', error);
+          setEvents(prev => prev.filter(e => e.id !== event.id));
+        } finally {
+          pendingOpsRef.current.delete(opKey);
+          setSyncing(pendingOpsRef.current.size > 0);
+        }
+      })();
     } else {
       // localStorage fallback
-    setEvents(prev => {
-      const newEvents = [...prev, event];
+      const newEvents = [...events, event];
       saveEvents(newEvents);
-      return newEvents;
-    });
     }
-  }, [userId, encryptEvent]);
+  }, [userId, events, encryptEvent]);
 
   const updateEvent = useCallback(async (eventId: string, updatedEvent: CalendarEvent) => {
     const supabase = supabaseRef.current;
+    
+    // Store previous event for potential rollback
+    const previousEvent = events.find(e => e.id === eventId);
+
+    // Optimistically update UI immediately
+    setEvents(prev => prev.map(e => e.id === eventId ? updatedEvent : e));
 
     if (userId) {
-      setSyncing(true);
-      
-      // Encrypt before saving
-      const encryptedEvent = await encryptEvent(updatedEvent);
-      
-      const { error } = await supabase
-        .from('events')
-        .update({
-          date: encryptedEvent.date,
-          title: encryptedEvent.title,
-          time: encryptedEvent.time,
-          end_time: encryptedEvent.endTime,
-          description: encryptedEvent.description,
-          color: encryptedEvent.color,
-          category: encryptedEvent.category,
-          is_recurring: encryptedEvent.isRecurring,
-          recurrence_pattern: encryptedEvent.recurrencePattern,
-          priority: encryptedEvent.priority,
-          completed: encryptedEvent.completed,
-          reminder: encryptedEvent.reminder,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', eventId)
-        .eq('user_id', userId);
-
-      if (!error) {
-        // Update with original (unencrypted) event
-        setEvents(prev => prev.map(e => e.id === eventId ? updatedEvent : e));
+      // Clear existing debounce timer for this event
+      const existingTimer = debounceTimersRef.current.get(eventId);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
       }
-      setSyncing(false);
+
+      // Debounce rapid sequential updates (300ms)
+      const timer = setTimeout(async () => {
+        debounceTimersRef.current.delete(eventId);
+        
+        // Check if operation is already pending
+        if (pendingOpsRef.current.has(eventId)) {
+          return;
+        }
+        
+        pendingOpsRef.current.add(eventId);
+        setSyncing(true);
+        
+        try {
+          // Get current event from state (may have changed during debounce)
+          const currentEvent = events.find(e => e.id === eventId) || updatedEvent;
+          
+          // Encrypt before saving
+          const encryptedEvent = await encryptEvent(currentEvent);
+          
+          const { error } = await supabase
+            .from('events')
+            .update({
+              date: encryptedEvent.date,
+              title: encryptedEvent.title,
+              time: encryptedEvent.time,
+              end_time: encryptedEvent.endTime,
+              description: encryptedEvent.description,
+              color: encryptedEvent.color,
+              category: encryptedEvent.category,
+              is_recurring: encryptedEvent.isRecurring,
+              recurrence_pattern: encryptedEvent.recurrencePattern,
+              priority: encryptedEvent.priority,
+              completed: encryptedEvent.completed,
+              reminder: encryptedEvent.reminder,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', eventId)
+            .eq('user_id', userId);
+
+          if (error) {
+            // Rollback on error
+            console.error('Failed to update event:', error);
+            if (previousEvent) {
+              setEvents(prev => prev.map(e => e.id === eventId ? previousEvent : e));
+            }
+          }
+        } catch (error) {
+          console.error('Error updating event:', error);
+          if (previousEvent) {
+            setEvents(prev => prev.map(e => e.id === eventId ? previousEvent : e));
+          }
+        } finally {
+          pendingOpsRef.current.delete(eventId);
+          setSyncing(pendingOpsRef.current.size > 0);
+        }
+      }, 300);
+
+      debounceTimersRef.current.set(eventId, timer);
     } else {
-    setEvents(prev => {
-      const newEvents = prev.map(e => e.id === eventId ? updatedEvent : e);
-    saveEvents(newEvents);
-      return newEvents;
-    });
+      // localStorage fallback
+      const newEvents = events.map(e => e.id === eventId ? updatedEvent : e);
+      saveEvents(newEvents);
     }
-  }, [userId, encryptEvent]);
+  }, [userId, events, encryptEvent]);
 
   const deleteEvent = useCallback(async (eventId: string) => {
     const supabase = supabaseRef.current;
+    
+    // Store event for potential rollback
+    const eventToDelete = events.find(e => e.id === eventId);
+
+    // Optimistically remove from UI immediately
+    setEvents(prev => prev.filter(e => e.id !== eventId));
 
     if (userId) {
-      setSyncing(true);
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', eventId)
-        .eq('user_id', userId);
+      // Save to database in background (non-blocking)
+      (async () => {
+        const opKey = `delete-${eventId}`;
+        if (pendingOpsRef.current.has(opKey)) return;
+        
+        pendingOpsRef.current.add(opKey);
+        setSyncing(true);
+        
+        try {
+          const { error } = await supabase
+            .from('events')
+            .delete()
+            .eq('id', eventId)
+            .eq('user_id', userId);
 
-      if (!error) {
-        // Optimistic update
-        setEvents(prev => prev.filter(e => e.id !== eventId));
-      }
-      setSyncing(false);
+          if (error) {
+            // Rollback on error
+            console.error('Failed to delete event:', error);
+            if (eventToDelete) {
+              setEvents(prev => [...prev, eventToDelete]);
+            }
+          }
+        } catch (error) {
+          console.error('Error deleting event:', error);
+          if (eventToDelete) {
+            setEvents(prev => [...prev, eventToDelete]);
+          }
+        } finally {
+          pendingOpsRef.current.delete(opKey);
+          setSyncing(pendingOpsRef.current.size > 0);
+        }
+      })();
     } else {
-    setEvents(prev => {
-      const newEvents = prev.filter(e => e.id !== eventId);
-    saveEvents(newEvents);
-      return newEvents;
-    });
+      // localStorage fallback
+      const newEvents = events.filter(e => e.id !== eventId);
+      saveEvents(newEvents);
     }
-  }, [userId]);
+  }, [userId, events]);
 
   const toggleEventCompletion = useCallback(async (eventId: string) => {
     const event = events.find(e => e.id === eventId);
     if (!event) return;
 
     const updatedEvent = { ...event, completed: !event.completed };
+    // updateEvent already handles optimistic updates
     await updateEvent(eventId, updatedEvent);
   }, [events, updateEvent]);
 
