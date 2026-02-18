@@ -102,13 +102,14 @@ export function useEvents(options: UseEventsOptions = {}) {
     
     const supabase = supabaseRef.current;
     
-    // Check if user already has events in Supabase
-    const { count } = await supabase
+    // Check if user already has events in Supabase (GET avoids HEAD/cache issues)
+    const { data: existing } = await supabase
       .from('events')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', uid);
+      .select('id')
+      .eq('user_id', uid)
+      .limit(1);
 
-    if (count && count > 0) {
+    if (existing && existing.length > 0) {
       hasMigratedRef.current = true;
       return;
     }

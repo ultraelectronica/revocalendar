@@ -197,7 +197,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           .from('spotify_tokens')
           .select('*')
           .eq('user_id', currentUserId)
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           // Validate data from Supabase
