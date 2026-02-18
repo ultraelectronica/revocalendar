@@ -98,6 +98,8 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
   const supabaseRef = useRef(createClient());
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetchPlaybackRef = useRef<( () => Promise<void>) | null>(null);
+  const lastDominantColorTrackIdRef = useRef<string | null>(null);
   const initializingRef = useRef(false); // Prevent concurrent initialization
   const initializedRef = useRef(false); // Track if we've already initialized successfully
   const userIdRef = useRef(userId); // Track userId without causing re-renders
@@ -383,9 +385,10 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         }
         
         const mood = null;
-          
-        // Extract dominant color from album art
-        if (track.album.images[0]) {
+
+        // Extract dominant color only when track changes (avoids repeated image load + setState on poll)
+        if (track.album.images[0] && lastDominantColorTrackIdRef.current !== track.id) {
+          lastDominantColorTrackIdRef.current = track.id;
           extractDominantColor(track.album.images[0].url).then(color => {
             setState(prev => ({ ...prev, dominantColor: color }));
           }).catch(() => {
@@ -408,6 +411,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           error: null,
         }));
       } else {
+        lastDominantColorTrackIdRef.current = null;
         setState(prev => ({
           ...prev,
           playbackState: null,
@@ -457,7 +461,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
           : null 
       }));
     }
-  }, [getValidToken, state.currentTrack, state.mood]);
+  }, [getValidToken]);
 
   // Fetch devices
   const fetchDevices = useCallback(async () => {
@@ -547,12 +551,12 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         return;
       }
 
-      // Successfully initialized
+      // Successfully initialized — show UI immediately, fetch data in background
       initializedRef.current = true;
-      setState(prev => ({ ...prev, isConnected: true, error: null }));
-      
-      // Fetch initial data
-      await Promise.allSettled([
+      setState(prev => ({ ...prev, isConnected: true, isLoading: false, error: null }));
+
+      // Fetch initial data in background so loading doesn't block the UI
+      void Promise.allSettled([
         fetchUser(),
         fetchPlayback(),
         fetchDevices(),
@@ -560,13 +564,13 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
       ]);
     } catch (err) {
       console.error('[Spotify] Initialization error:', err);
-      setState(prev => ({ 
-        ...prev, 
-        isConnected: false, 
-        error: err instanceof Error ? err.message : 'Failed to initialize Spotify' 
+      setState(prev => ({
+        ...prev,
+        isConnected: false,
+        error: err instanceof Error ? err.message : 'Failed to initialize Spotify',
       }));
     } finally {
-      setState(prev => ({ ...prev, isLoading: false }));
+      setState(prev => (prev.isLoading ? { ...prev, isLoading: false } : prev));
       initializingRef.current = false;
     }
   }, [loadTokens, getValidToken, fetchUser, fetchPlayback, fetchDevices, fetchRecentlyPlayed, deleteTokens]);
@@ -645,10 +649,15 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
     };
   }, [state.isPlaying]);
 
+  // Keep ref updated so interval always calls latest fetch without effect re-running
+  fetchPlaybackRef.current = fetchPlayback;
+
   // Playback polling (every 5 seconds when playing)
   useEffect(() => {
     if (state.isConnected && state.isPlaying) {
-      playbackIntervalRef.current = setInterval(fetchPlayback, 5000);
+      playbackIntervalRef.current = setInterval(() => {
+        fetchPlaybackRef.current?.();
+      }, 5000);
     } else {
       if (playbackIntervalRef.current) {
         clearInterval(playbackIntervalRef.current);
@@ -660,7 +669,7 @@ export function useSpotifyProvider({ userId }: SpotifyProviderOptions) {
         clearInterval(playbackIntervalRef.current);
       }
     };
-  }, [state.isConnected, state.isPlaying, fetchPlayback]);
+  }, [state.isConnected, state.isPlaying]);
 
   // Connect to Spotify
   const connect = useCallback(async () => {
