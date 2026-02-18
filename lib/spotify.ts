@@ -311,6 +311,7 @@ export class SpotifyAPI {
 
     const response = await fetch(`https://api.spotify.com/v1${endpoint}`, {
       ...options,
+      cache: 'no-store', // Avoid 304 responses with empty body; ensures consistent parsing and prevents cache-driven retry loops
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
@@ -320,6 +321,11 @@ export class SpotifyAPI {
 
     if (response.status === 204) {
       return {} as T;
+    }
+
+    if (response.status === 304) {
+      // 304 Not Modified has no body; treat as error so callers don't parse empty JSON
+      throw new Error('Spotify API 304: Cached response has no body. Use cache: no-store.');
     }
 
     if (!response.ok) {
