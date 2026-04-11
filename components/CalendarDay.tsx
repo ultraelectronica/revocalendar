@@ -44,7 +44,7 @@ export default function CalendarDay({
             ? 'bg-white/[0.03] border border-white/10 hover:bg-white/[0.08] hover:border-white/20'
             : 'bg-transparent border border-transparent hover:bg-white/[0.03]'
         }
-        hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:shadow-md
+        hover:scale-[1.03] hover:shadow-lg active:scale-[0.97] active:shadow-md
       `}
     >
       {/* Hover gradient overlay */}

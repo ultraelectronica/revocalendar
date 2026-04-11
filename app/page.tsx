@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
-import FloatingLines from '@/components/FloatingLines';
+import Orb from '@/components/Orb';
 import UpcomingPlans from '@/components/UpcomingPlans';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
@@ -418,27 +418,20 @@ export default function Home() {
     [nav, isMounted] // Include isMounted to recalculate after hydration
   );
 
-  // Memoize background props to prevent re-renders
-  const backgroundProps = useMemo(() => ({
-    linesGradient: ['#06b6d4', '#8b5cf6', '#f97316', '#10b981'] as string[],
-    enabledWaves: ['top', 'middle', 'bottom'] as Array<'top' | 'middle' | 'bottom'>,
-    lineCount: [5, 7, 5] as number[],
-    animationSpeed: 0.8,
-    interactive: true,
-    parallax: true,
-    mixBlendMode: 'screen' as const,
-  }), []);
-
   // Show landing page for unauthenticated users
   if (!authLoading && !isAuthenticated) {
     return <LandingPage />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">
-      {/* Background Animation */}
-      <div className="fixed inset-0 z-0">
-        <FloatingLines {...backgroundProps} />
+    <div className="min-h-screen flex flex-col relative bg-[#05050A] overflow-hidden">
+      {/* Orb Background */}
+      <div className="fixed top-0 left-0 w-full h-[1000px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] opacity-40">
+          <Orb hue={280} hoverIntensity={0.3} backgroundColor="#05050A" />
+        </div>
+        <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#05050A] to-transparent" />
       </div>
 
       {/* Main Content */}

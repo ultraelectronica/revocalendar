@@ -101,7 +101,11 @@ body {
       0 16px 48px rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(255, 255, 255, 0.15),
       var(--glow-cyan);
-    transform: translateY(-2px);
+    transform: translateY(-2px) scale(1.01);
+  }
+  
+  .glass-card-hover:active {
+    transform: translateY(0) scale(0.99);
   }
 
   /* Neon text effects */
@@ -132,8 +136,8 @@ body {
     @apply bg-gradient-to-r from-cyan-500 to-cyan-600;
     @apply hover:from-cyan-400 hover:to-cyan-500;
     @apply text-slate-900 shadow-lg shadow-cyan-500/25;
-    @apply hover:shadow-xl hover:shadow-cyan-500/40 hover:-translate-y-0.5;
-    @apply active:translate-y-0 active:shadow-md;
+    @apply hover:shadow-xl hover:shadow-cyan-500/40 hover:-translate-y-0.5 hover:scale-[1.02];
+    @apply active:translate-y-0 active:shadow-md active:scale-[0.98];
   }
   
   .btn-secondary {
@@ -141,8 +145,8 @@ body {
     @apply bg-white/5 border border-white/10;
     @apply hover:bg-white/10 hover:border-white/20;
     @apply text-white/90;
-    @apply hover:-translate-y-0.5;
-    @apply active:translate-y-0;
+    @apply hover:-translate-y-0.5 hover:scale-[1.02];
+    @apply active:translate-y-0 active:scale-[0.98];
   }
   
   .btn-accent {
@@ -150,7 +154,8 @@ body {
     @apply bg-gradient-to-r from-violet-500 to-violet-600;
     @apply hover:from-violet-400 hover:to-violet-500;
     @apply text-white shadow-lg shadow-violet-500/25;
-    @apply hover:shadow-xl hover:shadow-violet-500/40 hover:-translate-y-0.5;
+    @apply hover:shadow-xl hover:shadow-violet-500/40 hover:-translate-y-0.5 hover:scale-[1.02];
+    @apply active:translate-y-0 active:scale-[0.98];
   }
   
   .btn-danger {
@@ -158,7 +163,8 @@ body {
     @apply bg-red-500/20 border border-red-500/30;
     @apply hover:bg-red-500/30 hover:border-red-500/50;
     @apply text-red-400;
-    @apply hover:-translate-y-0.5;
+    @apply hover:-translate-y-0.5 hover:scale-[1.02];
+    @apply active:translate-y-0 active:scale-[0.98];
   }
 
   /* Input styles */
