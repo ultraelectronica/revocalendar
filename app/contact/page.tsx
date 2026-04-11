@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Orb from '@/components/Orb';
+import Reveal from '@/components/Reveal';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -86,15 +87,19 @@ export default function ContactPage() {
 
         {/* Hero Title */}
         <section className="pt-20 pb-8 text-center px-4">
-          <h1 className="text-5xl sm:text-6xl font-bold text-white mb-4 tracking-tight">Get in touch</h1>
-          <p className="text-base text-white/40 max-w-md mx-auto">
-            Please feel free to send us any questions, feedback or suggestions you might have.
-          </p>
+          <Reveal>
+            <h1 className="text-5xl sm:text-6xl font-bold text-white mb-4 tracking-tight">Get in touch</h1>
+          </Reveal>
+          <Reveal delay={120}>
+            <p className="text-base text-white/40 max-w-md mx-auto">
+              Please feel free to send us any questions, feedback or suggestions you might have.
+            </p>
+          </Reveal>
         </section>
 
         {/* Form Card */}
         <section className="flex-1 px-4 pb-20">
-          <div className="max-w-xl mx-auto">
+          <Reveal delay={200} className="max-w-xl mx-auto">
             {/* Outer glow border */}
             <div className="rounded-2xl border border-white/[0.06] p-[1px] bg-gradient-to-b from-white/[0.05] to-transparent shadow-[0_0_80px_rgba(139,92,246,0.08)]">
               <div className="rounded-2xl bg-[#0c0c14]/90 backdrop-blur-xl p-6 sm:p-10">
@@ -233,7 +238,7 @@ export default function ContactPage() {
                 </a>
               </p>
             </div>
-          </div>
+          </Reveal>
         </section>
 
         {/* Footer */}

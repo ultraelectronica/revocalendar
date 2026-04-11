@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import Orb from '@/components/Orb';
+import LightRays from '@/components/LightRays';
+import Reveal from '@/components/Reveal';
 
 export default function AboutPage() {
   return (
@@ -52,34 +54,54 @@ export default function AboutPage() {
         <section className="px-6 pb-24 border-t border-white/[0.04]">
           <div className="max-w-5xl mx-auto pt-20">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-16 items-start">
-              {/* Left label */}
-              <div className="lg:col-span-2">
+              <Reveal direction="left" className="lg:col-span-2">
                 <div className="lg:sticky lg:top-32">
                   <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-3">The Problem</p>
-                  <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">Your productivity tools shouldn't spy on you.</h2>
+                  <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">Your productivity tools shouldn&apos;t spy on you.</h2>
                 </div>
-              </div>
-              {/* Right body */}
-              <div className="lg:col-span-3 space-y-6 text-white/50 text-[15px] leading-relaxed">
-                <p>
-                  Most calendar and note-taking apps treat your data as a product. They store your events in plaintext, sell insights to advertisers, and offer you convenience at the cost of privacy.
-                </p>
-                <p>
-                  We started Revo because we were tired of the tradeoff. We wanted something that was both gorgeous to use and completely private — a workspace where your schedule, notes, and reminders are encrypted on your device before they ever touch the cloud.
-                </p>
-                <p>
-                  Not even we can read your data. That's not a feature — it's the foundation.
-                </p>
-              </div>
+              </Reveal>
+              <Reveal direction="right" delay={100} className="lg:col-span-3">
+                <div className="space-y-6 text-white/50 text-[15px] leading-relaxed">
+                  <p>
+                    Most calendar and note-taking apps treat your data as a product. They store your events in plaintext, sell insights to advertisers, and offer you convenience at the cost of privacy.
+                  </p>
+                  <p>
+                    We started Revo because we were tired of the tradeoff. We wanted something that was both gorgeous to use and completely private — a workspace where your schedule, notes, and reminders are encrypted on your device before they ever touch the cloud.
+                  </p>
+                  <p>
+                    Not even we can read your data. That&apos;s not a feature — it&apos;s the foundation.
+                  </p>
+                </div>
+              </Reveal>
             </div>
           </div>
         </section>
 
         {/* Capabilities — horizontal scroll-like cards */}
-        <section className="px-6 py-24 bg-[#08080C] border-y border-white/[0.04]">
-          <div className="max-w-5xl mx-auto">
-            <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-4">What's inside</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-16">Built to keep you in flow.</h2>
+        <section className="px-6 py-24 bg-[#08080C] border-y border-white/[0.04] relative overflow-hidden">
+          {/* LightRays WebGL Background */}
+          <div className="absolute inset-0 z-0 opacity-65 mix-blend-screen">
+            <LightRays
+              raysOrigin="top-center"
+              raysColor="#8b5cf6"
+              raysSpeed={0.4}
+              lightSpread={1.8}
+              rayLength={1.4}
+              pulsating={true}
+              fadeDistance={0.9}
+              saturation={1.3}
+              followMouse={true}
+              mouseInfluence={0.08}
+              noiseAmount={0.05}
+              distortion={0.1}
+            />
+          </div>
+          <div className="absolute bottom-0 left-0 w-full h-40 bg-gradient-to-t from-[#08080C] to-transparent z-[1] pointer-events-none" />
+          <div className="max-w-5xl mx-auto relative z-10">
+            <Reveal>
+              <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-4">What&apos;s inside</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-16">Built to keep you in flow.</h2>
+            </Reveal>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.04] rounded-2xl overflow-hidden border border-white/[0.06]">
               {[
@@ -136,10 +158,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Builder Section — asymmetric, personal */}
+        {/* Builder Section */}
         <section className="px-6 py-24">
           <div className="max-w-5xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-16 items-start">
+            <Reveal className="grid grid-cols-1 lg:grid-cols-5 gap-16 items-start">
               <div className="lg:col-span-2">
                 <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-3">The Builder</p>
                 <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">Made by one developer, <br className="hidden lg:block" />for everyone.</h2>
@@ -169,15 +191,15 @@ export default function AboutPage() {
                   View on GitHub
                 </a>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* CTA */}
         <section className="px-6 pb-28">
-          <div className="max-w-3xl mx-auto text-center">
+          <Reveal className="max-w-3xl mx-auto text-center">
             <h3 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-5">Ready to own your time?</h3>
-            <p className="text-white/40 mb-10">It's free, encrypted, and yours.</p>
+            <p className="text-white/40 mb-10">It&apos;s free, encrypted, and yours.</p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-semibold shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 transition-all hover:-translate-y-1"
@@ -187,7 +209,7 @@ export default function AboutPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </Link>
-          </div>
+          </Reveal>
         </section>
 
         {/* Footer */}

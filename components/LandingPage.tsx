@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AuthModal from '@/components/AuthModal';
 import Orb from '@/components/Orb';
+import LightRays from '@/components/LightRays';
+import Reveal from '@/components/Reveal';
 
 // Extracted UI Mockups as simple components
 function DashboardMockup() {
@@ -44,12 +46,12 @@ function DashboardMockup() {
 
 function GridMockupOne() {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 rounded-full blur-[80px]"></div>
+    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group hover:border-violet-500/30 hover:-translate-y-1 transition-all duration-500">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 rounded-full blur-[80px] group-hover:bg-violet-600/20 transition-colors duration-500"></div>
       <h3 className="text-2xl font-semibold text-white mb-2 relative z-10">Smart Calendar<br/>& Event Management</h3>
       <p className="text-white/50 text-sm mb-8 relative z-10 leading-relaxed">Seamlessly organize your schedule, track recurring events, and unlock intuitive drag-and-drop planning to reclaim your time.</p>
-      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 relative z-10 flex flex-col items-center justify-center shadow-lg">
-         <div className="w-24 h-24 rounded-full border-[8px] border-violet-500/20 border-l-violet-500 border-t-violet-400 mb-6 drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]"></div>
+      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 relative z-10 flex flex-col items-center justify-center shadow-lg group-hover:border-white/10 transition-colors duration-500">
+         <div className="w-24 h-24 rounded-full border-[8px] border-violet-500/20 border-l-violet-500 border-t-violet-400 mb-6 drop-shadow-[0_0_15px_rgba(139,92,246,0.3)] group-hover:drop-shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-all duration-500"></div>
          <div className="w-full h-3 bg-white/10 rounded mb-3"></div>
          <div className="w-full h-3 bg-white/10 rounded mb-3"></div>
          <div className="w-3/4 h-3 bg-white/5 rounded"></div>
@@ -60,9 +62,9 @@ function GridMockupOne() {
 
 function GridMockupTwo() {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group">
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-600/10 rounded-full blur-[80px]"></div>
-      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 mb-8 relative z-10 shadow-lg">
+    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group hover:border-cyan-500/30 hover:-translate-y-1 transition-all duration-500">
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-600/10 rounded-full blur-[80px] group-hover:bg-cyan-600/20 transition-colors duration-500"></div>
+      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 mb-8 relative z-10 shadow-lg group-hover:border-white/10 transition-colors duration-500">
          <div className="flex gap-2 sm:gap-4 mb-6 opacity-60">
             <div className="h-8 w-1/3 bg-white/10 rounded"></div>
             <div className="h-8 w-1/3 bg-white/10 rounded"></div>
@@ -141,54 +143,84 @@ export default function LandingPage() {
         {/* Hero Section */}
         <section className="flex-1 flex flex-col items-center justify-center pt-28 pb-16 px-4 text-center">
           <div className="max-w-3xl mx-auto z-10 relative">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-[1.1]">
-              Time, Mastered. <br/> Starting Now.
-            </h1>
-            <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto">
-              Revo brings your schedule, notes, and focus sessions into one beautifully cohesive and encrypted workspace.
-            </p>
+            <Reveal delay={0}>
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-[1.1]">
+                Time, Mastered. <br/> Starting Now.
+              </h1>
+            </Reveal>
+            <Reveal delay={120}>
+              <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto">
+                Revo brings your schedule, notes, and focus sessions into one beautifully cohesive and encrypted workspace.
+              </p>
+            </Reveal>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-               <div className="flex w-full sm:w-auto p-[3px] rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all focus-within:border-white/20">
-                  <input 
-                    type="text" 
-                    placeholder="Enter your email address" 
-                    className="bg-transparent border-none text-white px-6 py-3 w-full sm:w-64 focus:outline-none placeholder:text-white/30 text-sm"
-                  />
-                  <button 
-                    onClick={() => setIsAuthModalOpen(true)}
-                    className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
-                  >
-                    Get Started
-                  </button>
-               </div>
-            </div>
+            <Reveal delay={240}>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+                 <div className="flex w-full sm:w-auto p-[3px] rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all focus-within:border-white/20 hover:border-white/20">
+                    <input 
+                      type="text" 
+                      placeholder="Enter your email address" 
+                      className="bg-transparent border-none text-white px-6 py-3 w-full sm:w-64 focus:outline-none placeholder:text-white/30 text-sm"
+                    />
+                    <button 
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
+                    >
+                      Get Started
+                    </button>
+                 </div>
+              </div>
+            </Reveal>
             
-            <div className="flex items-center justify-center gap-2 text-xs text-white/40">
-               <span>Open Source & Free Forever</span>
-               <span className="text-white/20">✦</span>
-               <span>Built for Personal Growth</span>
-            </div>
+            <Reveal delay={340}>
+              <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+                 <span>Open Source & Free Forever</span>
+                 <span className="text-white/20">✦</span>
+                 <span>Built for Personal Growth</span>
+              </div>
+            </Reveal>
           </div>
         </section>
 
         {/* Dashboard Mockup Section */}
         <section className="px-4 pb-28 relative">
-          {/* subtle glow behind dashboard */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-64 bg-violet-500/20 blur-[120px] rounded-full pointer-events-none -z-10"></div>
-          <DashboardMockup />
+          <Reveal>
+            <DashboardMockup />
+          </Reveal>
         </section>
 
         {/* Grid Mockup Section */}
-        <section className="px-4 py-32 bg-[#08080C] border-t border-white/5 relative">
-          <div className="max-w-5xl mx-auto">
-             <div className="text-center mb-16">
-               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">Meet Your New <br/> Productivity Hub</h2>
-             </div>
-             
+        <section className="px-4 py-32 bg-[#08080C] border-t border-white/5 relative overflow-hidden">
+          {/* LightRays WebGL Background */}
+          <div className="absolute inset-0 z-0 opacity-60 mix-blend-screen">
+            <LightRays
+              raysOrigin="top-center"
+              raysColor="#8b5cf6"
+              raysSpeed={0.4}
+              lightSpread={1.8}
+              rayLength={1.4}
+              pulsating={true}
+              fadeDistance={0.9}
+              saturation={1.3}
+              followMouse={true}
+              mouseInfluence={0.08}
+              noiseAmount={0.05}
+              distortion={0.1}
+            />
+          </div>
+          <div className="absolute bottom-0 left-0 w-full h-40 bg-gradient-to-t from-[#08080C] to-transparent z-[1] pointer-events-none" />
+
+          <div className="max-w-5xl mx-auto relative z-10">
+             <Reveal>
+               <div className="text-center mb-16">
+                 <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">Meet Your New <br/> Productivity Hub</h2>
+               </div>
+             </Reveal>
+
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-                <GridMockupOne />
-                <GridMockupTwo />
+                <Reveal delay={0}><GridMockupOne /></Reveal>
+                <Reveal delay={150}><GridMockupTwo /></Reveal>
              </div>
           </div>
         </section>
