@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Note, ContentBlock } from '@/types';
 import { parseContentToBlocks, createBlock, serializeBlocks } from '@/utils/noteBlocks';
+import Orb from '@/components/Orb';
 import NoteEditor from './NoteEditor';
 import NoteList from './NoteList';
 
@@ -53,25 +54,59 @@ export default function NotesPage({
     return notes.find(n => n.id === selectedNoteId) || null;
   }, [notes, selectedNoteId]);
 
-  // Filter notes based on search
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery.trim()) return notes;
-    const query = searchQuery.toLowerCase();
-    return notes.filter(note => {
-      const blocks = parseContentToBlocks(note.content);
-      const text = blocks.map(b => 
-        b.content.map(s => s.text).join('')
-      ).join(' ').toLowerCase();
-      return text.includes(query) || (note.title?.toLowerCase().includes(query));
+  const [sortBy, setSortBy] = useState<'updatedAt' | 'title'>('updatedAt');
+  const [filterColor, setFilterColor] = useState<string | 'all'>('all');
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+
+  // Filter and sort notes
+  const processedNotes = useMemo(() => {
+    let result = [...notes]; // copy to avoid mutation
+
+    // Filter by search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(note => {
+        const blocks = parseContentToBlocks(note.content);
+        const text = blocks.map(b => 
+          b.content.map(s => s.text).join('')
+        ).join(' ').toLowerCase();
+        return text.includes(query) || (note.title?.toLowerCase().includes(query));
+      });
+    }
+
+    // Filter by color
+    if (filterColor !== 'all') {
+      result = result.filter(note => {
+        if (filterColor === 'none') return note.color === null;
+        return note.color === filterColor;
+      });
+    }
+
+    // Filter by pinned
+    if (showPinnedOnly) {
+      result = result.filter(note => note.pinned);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      // Pinned always first
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [notes, searchQuery]);
+
+    return result;
+  }, [notes, searchQuery, filterColor, showPinnedOnly, sortBy]);
 
   // Auto-select first note only on initial load — not when user explicitly closed via back/drag
   useMemo(() => {
-    if (!userClosedEditor && !selectedNoteId && filteredNotes.length > 0) {
-      setSelectedNoteId(filteredNotes[0].id);
+    if (!userClosedEditor && !selectedNoteId && processedNotes.length > 0) {
+      setSelectedNoteId(processedNotes[0].id);
     }
-  }, [filteredNotes, selectedNoteId, userClosedEditor]);
+  }, [processedNotes, selectedNoteId, userClosedEditor]);
 
   const handleCreateNote = async () => {
     const newBlock = createBlock('paragraph', '');
@@ -154,9 +189,18 @@ export default function NotesPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] flex flex-col">
+    <div className="min-h-screen bg-[#05050A] flex flex-col relative overflow-hidden">
+      {/* Orb Background */}
+      <div className="fixed top-0 left-0 w-full h-[1000px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] opacity-40">
+          <Orb hue={280} hoverIntensity={0.3} backgroundColor="#05050A" />
+        </div>
+        <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#05050A] to-transparent" />
+      </div>
+
       {/* Header */}
-      <header className="border-b border-white/10 bg-[#0a0a12]/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-white/10 bg-[#05050A]/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo and Back Button */}
@@ -203,7 +247,7 @@ export default function NotesPage({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCreateNote}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-orange-500/20 to-pink-500/20 border border-white/10 text-white text-xs sm:text-sm font-medium hover:from-orange-500/30 hover:to-pink-500/30 transition-all flex items-center gap-2"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-orange-500/20 to-pink-500/20 border border-white/10 text-white text-xs sm:text-sm font-medium hover:from-orange-500/30 hover:to-pink-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -217,13 +261,13 @@ export default function NotesPage({
 
       {/* Main Content */}
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative z-10">
         {/* Sidebar - Note List */}
         <aside 
-          className="w-full sm:w-80 lg:w-96 border-r border-white/10 bg-[#0a0a12] flex flex-col absolute sm:static inset-0 z-0 sm:z-auto"
+          className="w-full sm:w-80 lg:w-96 border-r border-white/10 bg-[#05050A]/80 backdrop-blur-sm flex flex-col absolute sm:static inset-0 z-0 sm:z-auto"
         >
           {/* Search */}
-          <div className="p-3 sm:p-4 border-b border-white/10">
+          <div className="p-3 sm:p-4 border-b border-white/10 flex flex-col gap-3">
             <div className="relative">
               <input
                 type="text"
@@ -241,12 +285,46 @@ export default function NotesPage({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
+            
+            {/* Controls */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value as 'updatedAt' | 'title')}
+                className="bg-white/5 border border-white/10 rounded-md text-xs text-white/70 px-2 py-1 outline-none focus:border-cyan-500/50 cursor-pointer"
+                title="Sort notes"
+              >
+                <option value="updatedAt" className="bg-[#05050A]">Latest</option>
+                <option value="title" className="bg-[#05050A]">Auto-Sort</option>
+              </select>
+              <select 
+                value={filterColor} 
+                onChange={(e) => setFilterColor(e.target.value)}
+                className="bg-white/5 border border-white/10 rounded-md text-xs text-white/70 px-2 py-1 outline-none focus:border-cyan-500/50 cursor-pointer"
+                title="Filter by color"
+              >
+                <option value="all" className="bg-[#05050A]">All Colors</option>
+                <option value="none" className="bg-[#05050A]">Default</option>
+                {NOTE_COLORS.filter(c => c.value !== null).map(c => (
+                  <option key={c.value} value={c.value!} className="bg-[#05050A]">{c.label}</option>
+                ))}
+              </select>
+              <button 
+                onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                className={`text-xs px-2 py-1 rounded-md border transition-all ${
+                  showPinnedOnly ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
+                }`}
+                title="Toggle pinned notes"
+              >
+                Pinned
+              </button>
+            </div>
           </div>
 
           {/* Note List */}
           <div className="flex-1 overflow-y-auto">
             <NoteList
-              notes={filteredNotes}
+              notes={processedNotes}
               selectedNoteId={selectedNoteId}
               onSelectNote={(id) => {
                 setUserClosedEditor(false);
@@ -263,7 +341,7 @@ export default function NotesPage({
         {/* Main Editor Area */}
         <main 
           className={`
-            w-full sm:flex-1 flex flex-col overflow-hidden bg-[#0a0a12] 
+            w-full sm:flex-1 flex flex-col overflow-hidden bg-[#08080C] border-l border-white/5
             absolute sm:static inset-0 z-10 sm:z-auto 
             ${isDragging ? '' : 'transition-transform duration-300 ease-in-out'}
             ${selectedNoteId ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'}

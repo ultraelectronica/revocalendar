@@ -93,6 +93,12 @@ function GridMockupTwo() {
 
 export default function LandingPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'signin' | 'signup'>('signin');
+
+  const openAuthModal = (mode: 'signin' | 'signup') => {
+    setAuthModalInitialMode(mode);
+    setIsAuthModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen flex flex-col relative bg-[#05050A]">
@@ -125,13 +131,13 @@ export default function LandingPage() {
             {/* Auth Buttons */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => setIsAuthModalOpen(true)}
+                onClick={() => openAuthModal('signin')}
                 className="text-sm font-medium text-white hover:text-white/80 transition-colors hidden sm:block"
               >
                 Log in
               </button>
               <button
-                onClick={() => setIsAuthModalOpen(true)}
+                onClick={() => openAuthModal('signup')}
                 className="px-5 py-2 rounded-full border border-white/10 text-sm font-medium text-white hover:bg-white/5 transition-all"
               >
                 Sign up
@@ -162,8 +168,8 @@ export default function LandingPage() {
                       placeholder="Enter your email address" 
                       className="bg-transparent border-none text-white px-6 py-3 w-full sm:w-64 focus:outline-none placeholder:text-white/30 text-sm"
                     />
-                    <button 
-                      onClick={() => setIsAuthModalOpen(true)}
+                     <button 
+                      onClick={() => openAuthModal('signup')}
                       className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
                     >
                       Get Started
@@ -236,9 +242,9 @@ export default function LandingPage() {
                    <span className="text-[15px] font-bold text-white tracking-tight">Revo</span>
                  </div>
                  <p className="text-sm text-white/50 mb-8 max-w-sm">Experience the next generation of personal productivity, scheduling, and encrypted note-taking.</p>
-                 <button onClick={() => setIsAuthModalOpen(true)} className="px-5 py-2.5 rounded-full border border-white/10 text-white/70 text-xs font-medium hover:bg-white/5 transition-all">
-                    Get Started for Free
-                 </button>
+                  <button onClick={() => openAuthModal('signup')} className="px-5 py-2.5 rounded-full border border-white/10 text-white/70 text-xs font-medium hover:bg-white/5 transition-all">
+                     Get Started for Free
+                  </button>
                </div>
                
                {/* Links */}
@@ -281,7 +287,7 @@ export default function LandingPage() {
         </footer>
       </div>
 
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialMode={authModalInitialMode} />
     </div>
   );
 }

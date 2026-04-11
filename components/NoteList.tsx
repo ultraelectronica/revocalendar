@@ -78,7 +78,7 @@ export default function NoteList({
   }
 
   return (
-    <div className="p-2 space-y-1">
+    <div className="p-2 grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-1">
       {notes.map((note) => {
         const isSelected = note.id === selectedNoteId;
         const preview = getPreview(note);
@@ -88,10 +88,11 @@ export default function NoteList({
             key={note.id}
             onClick={() => onSelectNote(note.id)}
             className={`
-              group relative p-3 rounded-lg cursor-pointer transition-all
+              group relative p-3 rounded-lg flex flex-col cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+              ${note.pinned ? 'col-span-2' : 'col-span-1'} sm:col-span-1
               ${isSelected 
                 ? 'bg-gradient-to-r from-orange-500/20 to-pink-500/20 border border-white/10' 
-                : 'hover:bg-white/5'
+                : 'hover:bg-white/5 bg-black/20 sm:bg-transparent border border-white/5 sm:border-transparent'
               }
               ${getColorClass(note.color)}
             `}
@@ -113,7 +114,7 @@ export default function NoteList({
             )}
             
             {/* Preview */}
-            <p className="text-white/60 text-xs line-clamp-2 mb-2">{preview}</p>
+            <p className="text-white/60 text-xs line-clamp-3 sm:line-clamp-2 mb-2 flex-1">{preview}</p>
             
             {/* Footer */}
             <div className="flex items-center justify-between">
