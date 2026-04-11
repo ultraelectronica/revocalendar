@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
@@ -24,32 +25,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { CalendarEvent } from '@/types';
 import { MONTHS } from '@/utils/dateUtils';
 
-// Saturn Logo Component
-function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Planet body */}
-      <circle cx="12" cy="12" r="6" fill="url(#planetGradient)" />
-      {/* Ring - behind */}
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" strokeWidth="1.5" fill="none" 
-        strokeDasharray="0 15.7 31.4" transform="rotate(-20 12 12)" />
-      {/* Ring - front */}
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" strokeWidth="1.5" fill="none"
-        strokeDasharray="31.4 15.7 0" transform="rotate(-20 12 12)" />
-      <defs>
-        <linearGradient id="planetGradient" x1="6" y1="6" x2="18" y2="18">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-        <linearGradient id="ringGradient" x1="2" y1="12" x2="22" y2="12">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="50%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#f97316" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
+// Removed SaturnLogo component
 
 // User Menu Component
 function UserMenu() {
@@ -474,7 +450,7 @@ export default function Home() {
             <div className="flex flex-col flex-shrink-0">
               <div className="flex items-end gap-2 sm:gap-3">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-slate-800/80 to-slate-900/80 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/10 flex-shrink-0 -mb-2">
-                  <SaturnLogo className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <Image src="/revologo.png" alt="Revo Logo" width={28} height={28} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
                 </div>
                 <h1 className="text-base sm:text-lg font-bold gradient-text">Revo</h1>
               </div>

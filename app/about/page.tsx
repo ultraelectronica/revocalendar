@@ -1,73 +1,33 @@
 'use client';
 
 import Link from 'next/link';
-import FloatingLines from '@/components/FloatingLines';
-
-// Saturn Logo Component
-function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="6" fill="url(#planetGradientAbout)" />
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradientAbout)" strokeWidth="1.5" fill="none" 
-        strokeDasharray="0 15.7 31.4" transform="rotate(-20 12 12)" />
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradientAbout)" strokeWidth="1.5" fill="none"
-        strokeDasharray="31.4 15.7 0" transform="rotate(-20 12 12)" />
-      <defs>
-        <linearGradient id="planetGradientAbout" x1="6" y1="6" x2="18" y2="18">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-        <linearGradient id="ringGradientAbout" x1="2" y1="12" x2="22" y2="12">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="50%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#f97316" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
+import Image from 'next/image';
+import Orb from '@/components/Orb';
 
 export default function AboutPage() {
-  const backgroundProps = {
-    linesGradient: ['#06b6d4', '#8b5cf6', '#f97316', '#10b981'] as string[],
-    enabledWaves: ['top', 'middle', 'bottom'] as Array<'top' | 'middle' | 'bottom'>,
-    lineCount: [4, 5, 4] as number[],
-    animationSpeed: 0.6,
-    interactive: false,
-    parallax: false,
-    mixBlendMode: 'screen' as const,
-  };
-
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">
-      {/* Background Animation */}
-      <div className="fixed inset-0 z-0">
-        <FloatingLines {...backgroundProps} />
+    <div className="min-h-screen flex flex-col relative bg-[#05050A]">
+      {/* Orb Background */}
+      <div className="absolute top-0 left-0 w-full h-[1000px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] -mt-[50px] opacity-50">
+          <Orb hue={280} hoverIntensity={0.3} backgroundColor="#05050A" />
+        </div>
+        <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#05050A] to-transparent" />
       </div>
-
-      {/* Background Overlay */}
-      <div className="fixed inset-0 z-[1] bg-[#0a0a12]/70 backdrop-blur-[3px]" />
 
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col">
         {/* Header */}
-        <header className="px-4 sm:px-6 py-4 border-b border-white/5">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            {/* Logo & Back */}
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800/80 to-slate-900/80 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/10 group-hover:border-white/20 transition-all">
-                <SaturnLogo className="w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold gradient-text">Revo</h1>
-                <p className="text-[9px] text-white/30 uppercase tracking-wider">Plan • Track • Achieve</p>
-              </div>
+        <header className="px-6 py-5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3">
+              <Image src="/revologo.png" alt="Revo Logo" width={28} height={28} className="object-contain" />
+              <span className="text-lg font-bold text-white tracking-tight">Revo</span>
             </Link>
-
-            {/* Back Button */}
             <Link
               href="/"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -77,114 +37,131 @@ export default function AboutPage() {
           </div>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 px-4 py-12 sm:py-16">
-          <div className="max-w-4xl mx-auto">
-            {/* Hero Section */}
-            <div className="text-center mb-12">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/10">
-                <SaturnLogo className="w-12 h-12" />
+        {/* Hero — editorial, full-width, big type */}
+        <section className="pt-24 sm:pt-32 pb-20 px-6 text-center">
+          <p className="text-violet-400/80 text-sm font-semibold uppercase tracking-[0.2em] mb-6">About Revo</p>
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.1] max-w-4xl mx-auto mb-8">
+            We believe your time <br className="hidden sm:block" />is <span className="gradient-text">yours to keep.</span>
+          </h1>
+          <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed font-light">
+            Revo is a privacy-first calendar and productivity workspace, built for individuals who refuse to compromise on security or design.
+          </p>
+        </section>
+
+        {/* Two-column Story Section */}
+        <section className="px-6 pb-24 border-t border-white/[0.04]">
+          <div className="max-w-5xl mx-auto pt-20">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-16 items-start">
+              {/* Left label */}
+              <div className="lg:col-span-2">
+                <div className="lg:sticky lg:top-32">
+                  <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-3">The Problem</p>
+                  <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">Your productivity tools shouldn't spy on you.</h2>
+                </div>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                About <span className="gradient-text">Revo</span>
-              </h1>
-              <p className="text-lg text-white/60 max-w-2xl mx-auto">
-                A beautifully designed, privacy-first calendar app built for students and professionals who value security and productivity.
-              </p>
+              {/* Right body */}
+              <div className="lg:col-span-3 space-y-6 text-white/50 text-[15px] leading-relaxed">
+                <p>
+                  Most calendar and note-taking apps treat your data as a product. They store your events in plaintext, sell insights to advertisers, and offer you convenience at the cost of privacy.
+                </p>
+                <p>
+                  We started Revo because we were tired of the tradeoff. We wanted something that was both gorgeous to use and completely private — a workspace where your schedule, notes, and reminders are encrypted on your device before they ever touch the cloud.
+                </p>
+                <p>
+                  Not even we can read your data. That's not a feature — it's the foundation.
+                </p>
+              </div>
             </div>
+          </div>
+        </section>
 
-            {/* Main Content Grid */}
-            <div className="grid gap-6 mb-12">
-              {/* Mission Section */}
-              <div className="glass-card p-6 sm:p-8">
-                <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        {/* Capabilities — horizontal scroll-like cards */}
+        <section className="px-6 py-24 bg-[#08080C] border-y border-white/[0.04]">
+          <div className="max-w-5xl mx-auto">
+            <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-4">What's inside</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-16">Built to keep you in flow.</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.04] rounded-2xl overflow-hidden border border-white/[0.06]">
+              {[
+                {
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
+                  ),
+                  title: 'End-to-End Encryption',
+                  desc: 'Zero-knowledge architecture. Your data is encrypted on-device before syncing to the cloud.',
+                  color: 'text-violet-400',
+                },
+                {
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  ),
+                  title: 'Smart Calendar',
+                  desc: 'Intuitive event management with recurring events, color coding, and adaptive layouts.',
+                  color: 'text-cyan-400',
+                },
+                {
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ),
+                  title: 'Focus Timer',
+                  desc: 'Built-in Pomodoro sessions with customizable durations and ambient alarm sounds.',
+                  color: 'text-orange-400',
+                },
+                {
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                  ),
+                  title: 'Spotify Integration',
+                  desc: 'Control your music without breaking focus. See what\'s playing right inside your workspace.',
+                  color: 'text-emerald-400',
+                },
+              ].map((item, i) => (
+                <div key={i} className="bg-[#0c0c14] p-8 sm:p-10 group hover:bg-[#0e0e18] transition-colors">
+                  <div className={`${item.color} mb-5 opacity-70 group-hover:opacity-100 transition-opacity`}>
+                    {item.icon}
                   </div>
-                  Our Mission
-                </h2>
-                <p className="text-white/60 leading-relaxed">
-                  Revo was created with a simple goal: to help people organize their lives without sacrificing their privacy. 
-                  In a world where your data is constantly being collected and monetized, we believe you deserve a productivity 
-                  tool that respects your privacy. Every event, note, and reminder you create is encrypted on your device 
-                  before it ever leaves — not even we can read your data.
-                </p>
+                  <h3 className="text-lg font-semibold text-white mb-2">{item.title}</h3>
+                  <p className="text-sm text-white/40 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Builder Section — asymmetric, personal */}
+        <section className="px-6 py-24">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-16 items-start">
+              <div className="lg:col-span-2">
+                <p className="text-xs text-white/30 uppercase tracking-[0.15em] mb-3">The Builder</p>
+                <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">Made by one developer, <br className="hidden lg:block" />for everyone.</h2>
               </div>
-
-              {/* What is Revo */}
-              <div className="glass-card p-6 sm:p-8">
-                <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  What is Revo?
-                </h2>
-                <p className="text-white/60 leading-relaxed mb-4">
-                  Revo is a modern calendar and productivity application designed specifically for students, 
-                  freelancers, and professionals who need a simple yet powerful way to manage their time.
-                </p>
-                <ul className="space-y-3 text-white/60">
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span><strong className="text-white/80">End-to-End Encryption</strong> — Your data is encrypted before leaving your device</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span><strong className="text-white/80">Focus Timer</strong> — Built-in Pomodoro timer to boost your productivity</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span><strong className="text-white/80">Spotify Integration</strong> — Control your music while staying focused</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span><strong className="text-white/80">Cloud Sync</strong> — Access your calendar from anywhere, securely</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Developer Section */}
-              <div className="glass-card p-6 sm:p-8">
-                <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                  </div>
-                  Built by
-                </h2>
-                <p className="text-white/60 leading-relaxed mb-4">
+              <div className="lg:col-span-3">
+                <p className="text-white/50 text-[15px] leading-relaxed mb-8">
                   Revo is developed and maintained by{' '}
-                  <a 
-                    href="https://github.com/ultraelectronica" 
-                    target="_blank" 
+                  <a
+                    href="https://github.com/ultraelectronica"
+                    target="_blank"
                     rel="noopener noreferrer"
-                    className="text-cyan-400 hover:text-cyan-300 transition-colors font-semibold inline-flex items-center gap-1"
+                    className="text-violet-400 hover:text-violet-300 transition-colors font-semibold"
                   >
                     Ultraelectronica
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
                   </a>
-                  , a deadass developer.
+                  , a deadass developer. This project is open source, free to use, and built with genuine love for clean design and strong privacy defaults.
                 </p>
-                <a 
-                  href="https://github.com/ultraelectronica" 
-                  target="_blank" 
+                <a
+                  href="https://github.com/ultraelectronica"
+                  target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm"
+                  className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-white/10 text-white/60 text-sm hover:bg-white/5 hover:text-white transition-all"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
@@ -193,33 +170,39 @@ export default function AboutPage() {
                 </a>
               </div>
             </div>
-
-            {/* CTA */}
-            <div className="text-center">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-semibold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all hover:-translate-y-1"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Get Started Free
-              </Link>
-            </div>
           </div>
-        </main>
+        </section>
+
+        {/* CTA */}
+        <section className="px-6 pb-28">
+          <div className="max-w-3xl mx-auto text-center">
+            <h3 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-5">Ready to own your time?</h3>
+            <p className="text-white/40 mb-10">It's free, encrypted, and yours.</p>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-semibold shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 transition-all hover:-translate-y-1"
+            >
+              Get Started
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </Link>
+          </div>
+        </section>
 
         {/* Footer */}
-        <footer className="px-4 py-6 border-t border-white/5">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <SaturnLogo className="w-4 h-4" />
-              <span className="text-xs text-white/40">© 2026 Revo. All rights reserved.</span>
+        <footer className="px-6 py-8 border-t border-white/[0.05] bg-[#020204]">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-md bg-white/[0.03] flex items-center justify-center border border-white/5">
+                <Image src="/revologo.png" alt="Revo Logo" width={14} height={14} className="opacity-50" />
+              </div>
+              <span className="text-[12px] text-white/30">© 2026 Revo. All rights reserved.</span>
             </div>
-            <div className="flex items-center gap-6 text-xs text-white/40">
-              <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-              <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+            <div className="flex items-center gap-6 text-[12px] text-white/30">
+              <Link href="/privacy" className="hover:text-white/80 transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-white/80 transition-colors">Terms</Link>
+              <Link href="/contact" className="hover:text-white/80 transition-colors">Contact</Link>
             </div>
           </div>
         </footer>
