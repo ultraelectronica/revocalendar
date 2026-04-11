@@ -331,34 +331,14 @@ export default function Home() {
     syncing: eventsSyncing,
   } = useEvents({ userId, encryption: encryptionHelpers });
   
-  const { 
-    notes, 
-    addNote,
-    updateNote,
-    deleteNote,
-    togglePinNote,
-    loading: notesLoading,
-    syncing: notesSyncing,
-  } = useNotes({ userId, encryption: encryptionHelpers });
+  const { syncing: notesSyncing } = useNotes({ userId, encryption: encryptionHelpers });
 
   // Settings hook for timezone
   const { settings, updateSettings } = useSettings({ userId });
 
   const isSyncing = eventsSyncing || notesSyncing;
-  const isLoading = authLoading || eventsLoading || notesLoading || encryptionLoading;
-
-  // Debug: Log loading states to identify which one is stuck
-  useEffect(() => {
-    console.log('[Loading Debug] States:', {
-      authLoading,
-      eventsLoading,
-      notesLoading,
-      encryptionLoading,
-      isLoading,
-      userId,
-      isAuthenticated,
-    });
-  }, [authLoading, eventsLoading, notesLoading, encryptionLoading, isLoading, userId, isAuthenticated]);
+  // Calendar does not render notes; waiting on notes fetch blocked the whole page on refresh.
+  const isLoading = authLoading || eventsLoading || encryptionLoading;
 
   // Show encryption modal when authenticated but encryption needs setup or unlock
   useEffect(() => {

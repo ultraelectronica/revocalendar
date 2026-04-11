@@ -66,7 +66,8 @@ export function useEvents(options: UseEventsOptions = {}) {
   const [syncing, setSyncing] = useState(false);
   const supabaseRef = useRef(createClient());
   const hasMigratedRef = useRef(false);
-  
+  const eventsRef = useRef<CalendarEvent[]>([]);
+
   // Queue for pending database operations
   const pendingOpsRef = useRef<Set<string>>(new Set());
   const debounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -95,6 +96,10 @@ export function useEvents(options: UseEventsOptions = {}) {
     if (!enc?.isUnlocked) return events;
     return Promise.all(events.map(e => enc.decryptFields(e, ENCRYPTED_EVENT_FIELDS)));
   }, []);
+
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
@@ -183,7 +188,9 @@ export function useEvents(options: UseEventsOptions = {}) {
                 const mapped = mapDbEventToLocal(payload.new as DbEvent);
                 const decrypted = await decryptEvent(mapped);
                 if (isMounted) {
-                  setEvents(prev => [...prev, decrypted]);
+                  setEvents(prev =>
+                    prev.some(e => e.id === decrypted.id) ? prev : [...prev, decrypted]
+                  );
                 }
               } else if (payload.eventType === 'UPDATE') {
                 const mapped = mapDbEventToLocal(payload.new as DbEvent);
@@ -300,8 +307,9 @@ export function useEvents(options: UseEventsOptions = {}) {
         setSyncing(true);
         
         try {
-          // Get current event from state (may have changed during debounce)
-          const currentEvent = events.find(e => e.id === eventId) || updatedEvent;
+          // Get latest event (debounced callback must not use stale `events` closure)
+          const currentEvent =
+            eventsRef.current.find(e => e.id === eventId) || updatedEvent;
           
           // Encrypt before saving
           const encryptedEvent = await encryptEvent(currentEvent);
