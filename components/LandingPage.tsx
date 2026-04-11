@@ -1,431 +1,293 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import FloatingLines from '@/components/FloatingLines';
+import Image from 'next/image';
 import AuthModal from '@/components/AuthModal';
+import Orb from '@/components/Orb';
+import LightRays from '@/components/LightRays';
+import Reveal from '@/components/Reveal';
 
-// Saturn Logo Component (matching the main app)
-function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
+// Extracted UI Mockups as simple components
+function DashboardMockup() {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="6" fill="url(#planetGradientLanding)" />
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradientLanding)" strokeWidth="1.5" fill="none" 
-        strokeDasharray="0 15.7 31.4" transform="rotate(-20 12 12)" />
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradientLanding)" strokeWidth="1.5" fill="none"
-        strokeDasharray="31.4 15.7 0" transform="rotate(-20 12 12)" />
-      <defs>
-        <linearGradient id="planetGradientLanding" x1="6" y1="6" x2="18" y2="18">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-        <linearGradient id="ringGradientLanding" x1="2" y1="12" x2="22" y2="12">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="50%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#f97316" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
-
-// Feature Card Component
-function FeatureCard({ 
-  icon, 
-  title, 
-  description, 
-  gradient 
-}: { 
-  icon: React.ReactNode; 
-  title: string; 
-  description: string;
-  gradient: string;
-}) {
-  return (
-    <div className="glass-card-hover p-6 group">
-      <div className={`w-12 h-12 rounded-xl ${gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-        {icon}
+    <div className="w-full max-w-5xl mx-auto rounded-xl border border-white/10 bg-[#0c0c14]/80 backdrop-blur-md overflow-hidden shadow-2xl relative z-10">
+      <div className="h-10 border-b border-white/5 flex items-center px-4 gap-2">
+        <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/80"/><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"/><div className="w-2.5 h-2.5 rounded-full bg-green-500/80"/></div>
       </div>
-      <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-      <p className="text-sm text-white/60 leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-// Solar System Circle Component
-function SolarSystemCircle() {
-  const [time, setTime] = useState<Date | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    setTime(new Date());
-  }, []);
-
-  useEffect(() => {
-    if (!isMounted) return;
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, [isMounted]);
-
-  // Calculate orbital rotation based on seconds
-  const orbitalRotation = useMemo(() => {
-    if (!time) return 0;
-    return (time.getSeconds() / 60) * 360;
-  }, [time]);
-
-  // Calculate hour rotation for outer ring
-  const hourRotation = useMemo(() => {
-    if (!time) return 0;
-    const hours = time.getHours() % 12;
-    const minutes = time.getMinutes();
-    return ((hours * 60 + minutes) / 720) * 360;
-  }, [time]);
-
-  return (
-    <div className="relative flex items-center justify-center">
-      {/* Ambient glow */}
-      <div className="absolute inset-0 -m-8 rounded-full bg-gradient-to-br from-cyan-500/15 via-violet-500/10 to-orange-500/10 blur-3xl" />
-
-      {/* Glassmorphism circle */}
-      <div className="relative w-96 h-96 sm:w-[28rem] sm:h-[28rem] lg:w-[32rem] lg:h-[32rem] rounded-full border border-white/10 bg-white/[0.06] backdrop-blur-xl shadow-2xl shadow-cyan-500/10 flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/10 via-transparent to-white/5 opacity-60" />
-        <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
-
-        {/* Solar System Animation */}
-        <div className="relative w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80">
-          {/* Outer glow ring */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/10 to-violet-500/10 blur-xl" />
-
-          {/* Outer orbit ring (hours) */}
-          <div 
-            className="absolute inset-0 rounded-full border border-white/10"
-            style={{
-              transform: `rotate(${hourRotation}deg)`,
-              transition: 'transform 1s linear',
-            }}
-          >
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 shadow-lg shadow-violet-500/50" />
-          </div>
-
-          {/* Middle orbit ring (minutes) */}
-          <div 
-            className="absolute inset-6 sm:inset-7 lg:inset-8 rounded-full border border-cyan-500/20"
-            style={{
-              transform: `rotate(${-orbitalRotation * 0.5}deg)`,
-              transition: 'transform 1s linear',
-            }}
-          >
-            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-lg shadow-cyan-500/50" />
-          </div>
-
-          {/* Inner orbit ring (seconds) */}
-          <div 
-            className="absolute inset-12 sm:inset-14 lg:inset-16 rounded-full border border-orange-500/30"
-            style={{
-              transform: `rotate(${orbitalRotation}deg)`,
-              transition: 'transform 1s linear',
-            }}
-          >
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-500/50" />
-          </div>
-
-          {/* Sun/Core */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full bg-gradient-to-br from-yellow-400 via-orange-500 to-amber-600 shadow-2xl shadow-orange-500/50 animate-pulse" />
-            <div className="absolute w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 rounded-full bg-gradient-to-br from-yellow-400/20 to-transparent blur-md" />
-          </div>
-
-          {/* Decorative stars */}
-          <div className="absolute top-2 right-6 sm:right-8 w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: '0.5s' }} />
-          <div className="absolute bottom-6 sm:bottom-8 left-3 w-1 h-1 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/3 left-1 w-1 h-1 rounded-full bg-white/50 animate-pulse" style={{ animationDelay: '1.5s' }} />
+      <div className="p-4 sm:p-8 flex items-start gap-6">
+        <div className="w-48 hidden md:flex flex-col gap-3 border-r border-white/5 pr-6">
+           <div className="h-6 w-24 bg-white/10 rounded"></div>
+           <div className="h-4 w-32 bg-white/5 rounded mt-4"></div>
+           <div className="h-4 w-28 bg-white/5 rounded"></div>
+           <div className="h-4 w-24 bg-white/5 rounded"></div>
+        </div>
+        <div className="flex-1">
+           <div className="flex justify-between items-center mb-6">
+             <div className="h-6 w-40 bg-white/10 rounded"></div>
+             <div className="h-8 w-24 bg-cyan-500/20 rounded border border-cyan-500/30"></div>
+           </div>
+           
+           <div className="space-y-3">
+             {[1,2,3,4,5,6].map(i => (
+               <div key={i} className="flex items-center gap-4 border-b border-white/5 pb-3">
+                 <div className="h-4 w-1/3 bg-white/5 rounded"></div>
+                 <div className="h-4 w-16 bg-white/10 rounded"></div>
+                 <div className="h-4 w-24 bg-white/5 rounded hidden sm:block"></div>
+                 <div className="h-4 w-12 bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center rounded"></div>
+               </div>
+             ))}
+           </div>
         </div>
       </div>
     </div>
   );
 }
 
+function GridMockupOne() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group hover:border-violet-500/30 hover:-translate-y-1 transition-all duration-500">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 rounded-full blur-[80px] group-hover:bg-violet-600/20 transition-colors duration-500"></div>
+      <h3 className="text-2xl font-semibold text-white mb-2 relative z-10">Smart Calendar<br/>& Event Management</h3>
+      <p className="text-white/50 text-sm mb-8 relative z-10 leading-relaxed">Seamlessly organize your schedule, track recurring events, and unlock intuitive drag-and-drop planning to reclaim your time.</p>
+      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 relative z-10 flex flex-col items-center justify-center shadow-lg group-hover:border-white/10 transition-colors duration-500">
+         <div className="w-24 h-24 rounded-full border-[8px] border-violet-500/20 border-l-violet-500 border-t-violet-400 mb-6 drop-shadow-[0_0_15px_rgba(139,92,246,0.3)] group-hover:drop-shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-all duration-500"></div>
+         <div className="w-full h-3 bg-white/10 rounded mb-3"></div>
+         <div className="w-full h-3 bg-white/10 rounded mb-3"></div>
+         <div className="w-3/4 h-3 bg-white/5 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+function GridMockupTwo() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0c0c14] p-6 sm:p-10 flex flex-col h-full relative overflow-hidden group hover:border-cyan-500/30 hover:-translate-y-1 transition-all duration-500">
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-600/10 rounded-full blur-[80px] group-hover:bg-cyan-600/20 transition-colors duration-500"></div>
+      <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-6 mb-8 relative z-10 shadow-lg group-hover:border-white/10 transition-colors duration-500">
+         <div className="flex gap-2 sm:gap-4 mb-6 opacity-60">
+            <div className="h-8 w-1/3 bg-white/10 rounded"></div>
+            <div className="h-8 w-1/3 bg-white/10 rounded"></div>
+            <div className="h-8 w-1/3 bg-white/10 rounded"></div>
+         </div>
+         <div className="flex gap-4 items-center border-b border-white/10 pb-4 mb-4">
+             <div className="h-6 w-32 bg-violet-500/20 rounded-full border border-violet-500/30"></div>
+             <div className="h-6 w-24 bg-white/5 rounded-full"></div>
+         </div>
+         <div className="space-y-4 opacity-50">
+            <div className="flex justify-between">
+                <div className="h-3 w-16 bg-white/10 rounded"></div>
+                <div className="h-3 w-8 bg-emerald-500 rounded"></div>
+            </div>
+            <div className="flex justify-between">
+                <div className="h-3 w-20 bg-white/10 rounded"></div>
+                <div className="h-3 w-8 bg-red-500 rounded"></div>
+            </div>
+         </div>
+      </div>
+      <h3 className="text-2xl font-semibold text-white mb-2 relative z-10">Integrated Focus Toolkit</h3>
+      <p className="text-white/50 text-sm relative z-10 leading-relaxed">Stay in the zone with our built-in Pomodoro timer, ambient soundscapes, and seamless Spotify integration directly in your calendar.</p>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'signin' | 'signup'>('signin');
 
-  const backgroundProps = {
-    linesGradient: ['#06b6d4', '#8b5cf6', '#f97316', '#10b981'] as string[],
-    enabledWaves: ['top', 'middle', 'bottom'] as Array<'top' | 'middle' | 'bottom'>,
-    lineCount: [5, 7, 5] as number[],
-    animationSpeed: 0.8,
-    interactive: true,
-    parallax: true,
-    mixBlendMode: 'screen' as const,
+  const openAuthModal = (mode: 'signin' | 'signup') => {
+    setAuthModalInitialMode(mode);
+    setIsAuthModalOpen(true);
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">
-      {/* Background Animation */}
-      <div className="fixed inset-0 z-0">
-        <FloatingLines {...backgroundProps} />
+    <div className="min-h-screen flex flex-col relative bg-[#05050A]">
+      {/* Orb Background */}
+      <div className="absolute top-0 left-0 w-full h-[1100px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1400px] h-[1400px] -mt-[100px] opacity-70">
+           <Orb hue={280} hoverIntensity={0.5} backgroundColor="#05050A" />
+         </div>
+         <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />
+         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#05050A] to-transparent" />
       </div>
-
-      {/* Background Overlay for better text readability */}
-      <div className="fixed inset-0 z-[1] bg-[#0a0a12]/60 backdrop-blur-[2px]" />
 
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col">
-        {/* Header / Navigation */}
-        <header className="px-4 sm:px-6 py-4 border-b border-white/5">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
+        {/* Navigation */}
+        <header className="px-6 py-5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800/80 to-slate-900/80 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/10">
-                <SaturnLogo className="w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold gradient-text">Revo</h1>
-                <p className="text-[9px] text-white/30 uppercase tracking-wider">Plan • Track • Achieve</p>
-              </div>
+              <Image src="/revologo.png" alt="Revo Logo" width={28} height={28} className="object-contain" />
+              <span className="text-lg font-bold text-white tracking-tight">Revo</span>
             </div>
 
+            {/* Links */}
+            <nav className="hidden md:flex items-center gap-8 text-sm text-white/70">
+              <Link href="/about" className="hover:text-white transition-colors">About</Link>
+              <Link href="/contact" className="hover:text-white transition-colors">Contact Us</Link>
+            </nav>
+
             {/* Auth Buttons */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-4">
               <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="btn-secondary text-xs sm:text-sm"
+                onClick={() => openAuthModal('signin')}
+                className="text-sm font-medium text-white hover:text-white/80 transition-colors hidden sm:block"
               >
-                Sign In
+                Log in
               </button>
               <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="btn-primary text-xs sm:text-sm"
+                onClick={() => openAuthModal('signup')}
+                className="px-5 py-2 rounded-full border border-white/10 text-sm font-medium text-white hover:bg-white/5 transition-all"
               >
-                Get Started
+                Sign up
               </button>
             </div>
           </div>
         </header>
 
         {/* Hero Section */}
-        <section className="flex-1 flex items-center px-4 sm:px-8 lg:px-12 py-16 sm:py-20 lg:py-24">
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-16 items-center">
-              {/* Left Content - 3 columns on lg */}
-              <div className="lg:col-span-3 text-left">
-                {/* Hero Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 fade-in">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs sm:text-sm text-white/70">Secure & Encrypted</span>
-                </div>
-
-                {/* Main Headline */}
-                <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 sm:mb-8 fade-in stagger-1 leading-[1.1]">
-                  Studying?
-                  <br />
-                  <span className="gradient-text text-glow-cyan">Simply Organized</span>
-                </h2>
-
-                {/* Subtitle */}
-                <p className="text-lg sm:text-xl text-white/60 max-w-xl mb-10 sm:mb-12 fade-in stagger-2 leading-relaxed">
-                  A stunning calendar app with end-to-end encryption, smart planning tools, focus timer, and Spotify integration. 
-                  Take control of your time.
-                </p>
-
-                {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row items-start gap-4 fade-in stagger-3 mb-12">
-                  <button
-                    onClick={() => setIsAuthModalOpen(true)}
-                    className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-semibold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all hover:-translate-y-1 flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Start Planning Free
-                  </button>
-                  <Link href="/about" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Learn More
-                  </Link>
-                </div>
-
-                {/* Trust Indicators */}
-                <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-white/50 fade-in stagger-4">
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Free forever tier
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    No credit card
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Setup in 30s
-                  </span>
-                </div>
+        <section className="flex-1 flex flex-col items-center justify-center pt-28 pb-16 px-4 text-center">
+          <div className="max-w-3xl mx-auto z-10 relative">
+            <Reveal delay={0}>
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-[1.1]">
+                Time, Mastered. <br/> Starting Now.
+              </h1>
+            </Reveal>
+            <Reveal delay={120}>
+              <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto">
+                Revo brings your schedule, notes, and focus sessions into one beautifully cohesive and encrypted workspace.
+              </p>
+            </Reveal>
+            
+            <Reveal delay={240}>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+                 <div className="flex w-full sm:w-auto p-[3px] rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.02)] transition-all focus-within:border-white/20 hover:border-white/20">
+                    <input 
+                      type="text" 
+                      placeholder="Enter your email address" 
+                      className="bg-transparent border-none text-white px-6 py-3 w-full sm:w-64 focus:outline-none placeholder:text-white/30 text-sm"
+                    />
+                     <button 
+                      onClick={() => openAuthModal('signup')}
+                      className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
+                    >
+                      Get Started
+                    </button>
+                 </div>
               </div>
-
-              {/* Right Content - Solar System Circle - 2 columns on lg */}
-              <div className="lg:col-span-2 flex items-center justify-center lg:justify-end fade-in stagger-2">
-                <SolarSystemCircle />
+            </Reveal>
+            
+            <Reveal delay={340}>
+              <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+                 <span>Open Source & Free Forever</span>
+                 <span className="text-white/20">✦</span>
+                 <span>Built for Personal Growth</span>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
 
-        {/* Features Section */}
-        <section className="px-4 py-16 sm:py-24">
-          <div className="max-w-6xl mx-auto">
-            {/* Section Header */}
-            <div className="text-center mb-12">
-              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                Everything You Need to <span className="gradient-text">Stay Productive</span>
-              </h3>
-              <p className="text-sm sm:text-base text-white/50 max-w-xl mx-auto">
-                Designed for focused work and seamless planning
-              </p>
-            </div>
-
-            {/* Features Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              <FeatureCard
-                icon={
-                  <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                }
-                title="Smart Calendar"
-                description="Intuitive event management with drag-and-drop, recurring events, and smart reminders."
-                gradient="bg-gradient-to-br from-cyan-500/20 to-cyan-600/20"
-              />
-              <FeatureCard
-                icon={
-                  <svg className="w-6 h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                }
-                title="End-to-End Encryption"
-                description="Your data is encrypted on your device. Not even we can read your events and notes."
-                gradient="bg-gradient-to-br from-violet-500/20 to-violet-600/20"
-              />
-              <FeatureCard
-                icon={
-                  <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-                title="Focus Timer"
-                description="Built-in Pomodoro timer with customizable sessions and ambient sounds to boost focus."
-                gradient="bg-gradient-to-br from-orange-500/20 to-orange-600/20"
-              />
-              <FeatureCard
-                icon={
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  </svg>
-                }
-                title="Spotify Integration"
-                description="Control your music while you work. See what's playing without leaving your calendar."
-                gradient="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20"
-              />
-            </div>
-          </div>
+        {/* Dashboard Mockup Section */}
+        <section className="px-4 pb-28 relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-64 bg-violet-500/20 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+          <Reveal>
+            <DashboardMockup />
+          </Reveal>
         </section>
 
-        {/* How It Works Section */}
-        <section className="px-4 py-16 sm:py-20">
-          <div className="max-w-4xl mx-auto">
-            {/* Section Header */}
-            <div className="text-center mb-12">
-              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                Get Started in <span className="gradient-text">3 Simple Steps</span>
-              </h3>
-              <p className="text-sm sm:text-base text-white/50">
-                From signup to full productivity in under a minute
-              </p>
-            </div>
-
-            {/* Steps */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {/* Step 1 */}
-              <div className="glass-card p-6 relative">
-                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-cyan-500/30">
-                  1
-                </div>
-                <div className="mt-2">
-                  <h4 className="text-lg font-semibold text-white mb-2">Create Account</h4>
-                  <p className="text-sm text-white/50">Sign up with email or Google. Set your encryption passphrase for maximum security.</p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="glass-card p-6 relative">
-                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-violet-500/30">
-                  2
-                </div>
-                <div className="mt-2">
-                  <h4 className="text-lg font-semibold text-white mb-2">Add Your Events</h4>
-                  <p className="text-sm text-white/50">Create events, set reminders, and organize your schedule with our intuitive interface.</p>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="glass-card p-6 relative">
-                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-orange-500/30">
-                  3
-                </div>
-                <div className="mt-2">
-                  <h4 className="text-lg font-semibold text-white mb-2">Stay Focused</h4>
-                  <p className="text-sm text-white/50">Use the focus timer, track your progress, and sync seamlessly across all your devices.</p>
-                </div>
-              </div>
-            </div>
+        {/* Grid Mockup Section */}
+        <section className="px-4 py-32 bg-[#08080C] border-t border-white/5 relative overflow-hidden">
+          {/* LightRays WebGL Background */}
+          <div className="absolute inset-0 z-0 opacity-60 mix-blend-screen">
+            <LightRays
+              raysOrigin="top-center"
+              raysColor="#8b5cf6"
+              raysSpeed={0.4}
+              lightSpread={1.8}
+              rayLength={1.4}
+              pulsating={true}
+              fadeDistance={0.9}
+              saturation={1.3}
+              followMouse={true}
+              mouseInfluence={0.08}
+              noiseAmount={0.05}
+              distortion={0.1}
+            />
           </div>
-        </section>
+          <div className="absolute bottom-0 left-0 w-full h-40 bg-gradient-to-t from-[#08080C] to-transparent z-[1] pointer-events-none" />
 
-        {/* CTA Section */}
-        <section className="px-4 py-16 sm:py-24">
-          <div className="max-w-2xl mx-auto text-center">
-            <div className="glass-card p-8 sm:p-12">
-              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                Ready to Transform Your Productivity?
-              </h3>
-              <p className="text-white/60 mb-8">
-                Join thousands of users who have taken control of their time with Revo.
-              </p>
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-semibold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all hover:-translate-y-1"
-              >
-                Get Started — It's Free
-              </button>
-            </div>
+          <div className="max-w-5xl mx-auto relative z-10">
+             <Reveal>
+               <div className="text-center mb-16">
+                 <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">Meet Your New <br/> Productivity Hub</h2>
+               </div>
+             </Reveal>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                <Reveal delay={0}><GridMockupOne /></Reveal>
+                <Reveal delay={150}><GridMockupTwo /></Reveal>
+             </div>
           </div>
         </section>
 
         {/* Footer */}
-        <footer className="px-4 py-8 border-t border-white/5">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <SaturnLogo className="w-5 h-5" />
-              <span className="text-sm text-white/40">© 2026 Revo. All rights reserved.</span>
+        <footer className="bg-[#05050A] pt-20 pb-10 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-12 mb-20">
+               {/* Brand Col */}
+               <div className="md:col-span-2">
+                 <div className="flex items-center gap-2 mb-6">
+                   <Image src="/revologo.png" alt="Revo Logo" width={20} height={20} className="object-contain" />
+                   <span className="text-[15px] font-bold text-white tracking-tight">Revo</span>
+                 </div>
+                 <p className="text-sm text-white/50 mb-8 max-w-sm">Experience the next generation of personal productivity, scheduling, and encrypted note-taking.</p>
+                  <button onClick={() => openAuthModal('signup')} className="px-5 py-2.5 rounded-full border border-white/10 text-white/70 text-xs font-medium hover:bg-white/5 transition-all">
+                     Get Started for Free
+                  </button>
+               </div>
+               
+               {/* Links */}
+               <div>
+                 <h4 className="text-white font-semibold mb-6 text-sm">Product</h4>
+                 <ul className="space-y-4 text-[13px] text-white/50">
+                   <li><Link href="/about" className="hover:text-white transition-colors">About Revo</Link></li>
+                   <li><Link href="/contact" className="hover:text-white transition-colors">Contact Support</Link></li>
+                 </ul>
+               </div>
+
+               <div>
+                 <h4 className="text-white font-semibold mb-6 text-sm">Legals</h4>
+                 <ul className="space-y-4 text-[13px] text-white/50">
+                   <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Services</Link></li>
+                   <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+                 </ul>
+               </div>
+
+               <div className="md:col-span-1">
+                 <h4 className="text-white font-semibold mb-6 text-sm">Community</h4>
+                 <ul className="space-y-4 text-[13px] text-white/50">
+                   <li><Link href="#" className="hover:text-white transition-colors">Feedback</Link></li>
+                   <li><Link href="#" className="hover:text-white transition-colors">Contribution</Link></li>
+                 </ul>
+               </div>
             </div>
-            <div className="flex items-center gap-6 text-sm text-white/40">
-              <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-              <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+
+            {/* Bottom Footer Border & Copyright */}
+            <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-white/10 text-[11px] text-white/40">
+               <p>©2026 Revo. All rights reserved.</p>
+               <div className="flex gap-6 mt-4 md:mt-0">
+                  <a href="#" className="hover:text-white transition-colors">IG</a>
+                  <a href="#" className="hover:text-white transition-colors">YT</a>
+                  <a href="#" className="hover:text-white transition-colors">IN</a>
+                  <a href="#" className="hover:text-white transition-colors">TW</a>
+               </div>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* Auth Modal */}
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialMode={authModalInitialMode} />
     </div>
   );
 }

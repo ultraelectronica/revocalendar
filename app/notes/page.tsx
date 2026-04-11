@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useEncryption } from '@/hooks/useEncryption';
 import { useNotes } from '@/hooks/useNotes';
 import NotesPage from '@/components/NotesPage';
-import LandingPage from '@/components/LandingPage';
 
 export default function NotesRoute() {
   const router = useRouter();
@@ -52,9 +51,16 @@ export default function NotesRoute() {
     syncing: notesSyncing,
   } = useNotes({ userId, encryption: encryptionHelpers });
 
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
   // Show landing page if not authenticated
   if (!isAuthenticated && !authLoading) {
-    return <LandingPage />;
+    return null;
   }
 
   // Show loading state

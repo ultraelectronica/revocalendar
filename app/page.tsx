@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Calendar from '@/components/Calendar';
 import EventModal from '@/components/EventModal';
 import EventListModal from '@/components/EventListModal';
-import FloatingLines from '@/components/FloatingLines';
+import Orb from '@/components/Orb';
 import UpcomingPlans from '@/components/UpcomingPlans';
 import SearchBar from '@/components/SearchBar';
 import QuickStats from '@/components/QuickStats';
@@ -24,32 +25,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { CalendarEvent } from '@/types';
 import { MONTHS } from '@/utils/dateUtils';
 
-// Saturn Logo Component
-function SaturnLogo({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Planet body */}
-      <circle cx="12" cy="12" r="6" fill="url(#planetGradient)" />
-      {/* Ring - behind */}
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" strokeWidth="1.5" fill="none" 
-        strokeDasharray="0 15.7 31.4" transform="rotate(-20 12 12)" />
-      {/* Ring - front */}
-      <ellipse cx="12" cy="12" rx="10" ry="3" stroke="url(#ringGradient)" strokeWidth="1.5" fill="none"
-        strokeDasharray="31.4 15.7 0" transform="rotate(-20 12 12)" />
-      <defs>
-        <linearGradient id="planetGradient" x1="6" y1="6" x2="18" y2="18">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-        <linearGradient id="ringGradient" x1="2" y1="12" x2="22" y2="12">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="50%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#f97316" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
+// Removed SaturnLogo component
 
 // User Menu Component
 function UserMenu() {
@@ -331,34 +307,14 @@ export default function Home() {
     syncing: eventsSyncing,
   } = useEvents({ userId, encryption: encryptionHelpers });
   
-  const { 
-    notes, 
-    addNote,
-    updateNote,
-    deleteNote,
-    togglePinNote,
-    loading: notesLoading,
-    syncing: notesSyncing,
-  } = useNotes({ userId, encryption: encryptionHelpers });
+  const { syncing: notesSyncing } = useNotes({ userId, encryption: encryptionHelpers });
 
   // Settings hook for timezone
   const { settings, updateSettings } = useSettings({ userId });
 
   const isSyncing = eventsSyncing || notesSyncing;
-  const isLoading = authLoading || eventsLoading || notesLoading || encryptionLoading;
-
-  // Debug: Log loading states to identify which one is stuck
-  useEffect(() => {
-    console.log('[Loading Debug] States:', {
-      authLoading,
-      eventsLoading,
-      notesLoading,
-      encryptionLoading,
-      isLoading,
-      userId,
-      isAuthenticated,
-    });
-  }, [authLoading, eventsLoading, notesLoading, encryptionLoading, isLoading, userId, isAuthenticated]);
+  // Calendar does not render notes; waiting on notes fetch blocked the whole page on refresh.
+  const isLoading = authLoading || eventsLoading || encryptionLoading;
 
   // Show encryption modal when authenticated but encryption needs setup or unlock
   useEffect(() => {
@@ -462,27 +418,20 @@ export default function Home() {
     [nav, isMounted] // Include isMounted to recalculate after hydration
   );
 
-  // Memoize background props to prevent re-renders
-  const backgroundProps = useMemo(() => ({
-    linesGradient: ['#06b6d4', '#8b5cf6', '#f97316', '#10b981'] as string[],
-    enabledWaves: ['top', 'middle', 'bottom'] as Array<'top' | 'middle' | 'bottom'>,
-    lineCount: [5, 7, 5] as number[],
-    animationSpeed: 0.8,
-    interactive: true,
-    parallax: true,
-    mixBlendMode: 'screen' as const,
-  }), []);
-
   // Show landing page for unauthenticated users
   if (!authLoading && !isAuthenticated) {
     return <LandingPage />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden aurora-bg">
-      {/* Background Animation */}
-      <div className="fixed inset-0 z-0">
-        <FloatingLines {...backgroundProps} />
+    <div className="min-h-screen flex flex-col relative bg-[#05050A] overflow-hidden">
+      {/* Orb Background */}
+      <div className="fixed top-0 left-0 w-full h-[1000px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] opacity-40">
+          <Orb hue={280} hoverIntensity={0.3} backgroundColor="#05050A" />
+        </div>
+        <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#05050A] to-transparent" />
       </div>
 
       {/* Main Content */}
@@ -494,7 +443,7 @@ export default function Home() {
             <div className="flex flex-col flex-shrink-0">
               <div className="flex items-end gap-2 sm:gap-3">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-slate-800/80 to-slate-900/80 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/10 flex-shrink-0 -mb-2">
-                  <SaturnLogo className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <Image src="/revologo.png" alt="Revo Logo" width={28} height={28} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
                 </div>
                 <h1 className="text-base sm:text-lg font-bold gradient-text">Revo</h1>
               </div>

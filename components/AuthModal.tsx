@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMode?: 'signin' | 'signup';
 }
 
 type AuthMode = 'signin' | 'signup' | 'reset' | 'verify';
@@ -132,8 +133,8 @@ function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
   );
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const [mode, setMode] = useState<AuthMode>('signin');
+export default function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -187,9 +188,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }, 300);
   };
 
-  // Reset form when modal opens/closes
+  // Reset form when modal opens
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -197,12 +198,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setOtpCode(Array(OTP_LENGTH).fill(''));
       setError(null);
       setSuccess(null);
-      setMode('signin');
+      setMode(initialMode);
       setResendCooldown(0);
       setShowPassword(false);
       setShowConfirmPassword(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialMode]);
 
   // Reset confirm password when switching modes
   useEffect(() => {

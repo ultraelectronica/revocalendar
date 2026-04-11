@@ -65,6 +65,8 @@ export function useNotes(options: UseNotesOptions = {}) {
   // Queue for pending database operations
   const pendingOpsRef = useRef<Set<string>>(new Set());
   const debounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  /** Chains saveNoteNow calls so a second save while one is in flight is not dropped */
+  const saveNoteChainRef = useRef<Map<string, Promise<void>>>(new Map());
 
   // Use ref for encryption to avoid dependency changes triggering refetch
   const encryptionRef = useRef(encryption);
@@ -221,7 +223,9 @@ export function useNotes(options: UseNotesOptions = {}) {
                       const mapped = mapDbNoteToLocal(payload.new as DbNote);
                       const decrypted = await decryptNote(mapped);
                       if (isMounted) {
-                        setNotes(prev => [decrypted, ...prev]);
+                        setNotes(prev =>
+                          prev.some(n => n.id === decrypted.id) ? prev : [decrypted, ...prev]
+                        );
                       }
                     } else if (payload.eventType === 'UPDATE') {
                       const mapped = mapDbNoteToLocal(payload.new as DbNote);
@@ -358,33 +362,52 @@ export function useNotes(options: UseNotesOptions = {}) {
     }
 
     const opKey = `save-${noteId}`;
-    if (pendingOpsRef.current.has(opKey)) return;
-    beginOp(opKey);
+    const prevChain = saveNoteChainRef.current.get(noteId);
+    const run = async () => {
+      if (prevChain) {
+        try {
+          await prevChain;
+        } catch {
+          // prior failure should not block this save
+        }
+      }
 
+      beginOp(opKey);
+      try {
+        const updateData: Record<string, unknown> = {
+          title: resolvedTitle,
+          updated_at: now,
+        };
+
+        if (contentToSave !== undefined) {
+          const encryptedContent = encryption?.isUnlocked
+            ? await encryption.encrypt(contentToSave)
+            : contentToSave;
+          updateData.content = encryptedContent;
+        }
+
+        const { error } = await supabase
+          .from('notes')
+          .update(updateData)
+          .eq('id', noteId)
+          .eq('user_id', userId);
+
+        if (error) {
+          throw error;
+        }
+      } finally {
+        endOp(opKey);
+      }
+    };
+
+    const p = run();
+    saveNoteChainRef.current.set(noteId, p);
     try {
-      const updateData: Record<string, unknown> = {
-        title: resolvedTitle,
-        updated_at: now,
-      };
-
-      if (contentToSave !== undefined) {
-        const encryptedContent = encryption?.isUnlocked
-          ? await encryption.encrypt(contentToSave)
-          : contentToSave;
-        updateData.content = encryptedContent;
-      }
-
-      const { error } = await supabase
-        .from('notes')
-        .update(updateData)
-        .eq('id', noteId)
-        .eq('user_id', userId);
-
-      if (error) {
-        throw error;
-      }
+      await p;
     } finally {
-      endOp(opKey);
+      if (saveNoteChainRef.current.get(noteId) === p) {
+        saveNoteChainRef.current.delete(noteId);
+      }
     }
   }, [userId, encryption, beginOp, endOp]);
 
@@ -762,7 +785,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         setSyncing(true);
         
         try {
-          const currentNote = notes.find(n => n.id === noteId);
+          const currentNote = notesRef.current.find(n => n.id === noteId);
           const titleToSave = currentNote?.title ?? title;
           
           const { error } = await supabase

@@ -77,7 +77,7 @@ function EventCard({ event, onClick, onToggleComplete, delay = 0 }: EventCardPro
         ${event.completed ? 'opacity-50' : ''}
         ${isOverdue ? 'border-l-4 border-l-red-500' : ''}
         ${event.priority === 'high' && !event.completed ? 'border-l-4 border-l-orange-500' : ''}
-        hover:bg-white/[0.08] hover:scale-[1.01] hover:-translate-x-0.5
+        hover:bg-white/[0.08] hover:scale-[1.02] active:scale-[0.98]
       `}
     >
       {/* Background gradient on hover */}
