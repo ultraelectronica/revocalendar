@@ -22,8 +22,8 @@ import { useEncryption } from '@/hooks/useEncryption';
 import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
 import { useSettings } from '@/hooks/useSettings';
-import { CalendarEvent } from '@/types';
-import { MONTHS } from '@/utils/dateUtils';
+import { CalendarEvent, CATEGORY_CONFIG, PRIORITY_CONFIG } from '@/types';
+import { MONTHS, formatDateDisplay, formatTime, parseDateString } from '@/utils/dateUtils';
 
 // Removed SaturnLogo component
 
@@ -209,9 +209,8 @@ function UserMenu() {
                       if (error) {
                         setSignOutError(error.message || 'Failed to sign out. Please try again.');
                       } else {
+                        setSignOutError(null);
                         setShowSignOutConfirm(false);
-                        // Optionally refresh the page to ensure clean state
-                        window.location.reload();
                       }
                     } catch (err) {
                       setSignOutError('An unexpected error occurred. Please try again.');
@@ -259,7 +258,7 @@ export default function Home() {
   const [isEventListOpen, setIsEventListOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-  const [showMobileStats, setShowMobileStats] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'day' | 'tools' | 'stats'>('day');
   const [showEncryptionModal, setShowEncryptionModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -356,6 +355,10 @@ export default function Home() {
 
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      setMobilePanel('day');
+      return;
+    }
     setIsEventListOpen(true);
   };
 
@@ -368,6 +371,7 @@ export default function Home() {
   const handleQuickAddEvent = () => {
     const today = new Date();
     setSelectedDate(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
+    setMobilePanel('day');
     setEditingEvent(null);
     setIsEventModalOpen(true);
   };
@@ -375,6 +379,7 @@ export default function Home() {
   const handleEditEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
     setSelectedDate(event.date);
+    setMobilePanel('day');
     setIsEventListOpen(false);
     setIsEventModalOpen(true);
   };
@@ -418,6 +423,78 @@ export default function Home() {
     [nav, isMounted] // Include isMounted to recalculate after hydration
   );
 
+  const todayDateString = useMemo(() => {
+    const today = new Date();
+    return `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+  }, [isMounted]);
+
+  const mobileSelectedDate = selectedDate ?? todayDateString;
+
+  const mobileSelectedEvents = useMemo(() => {
+    if (!mobileSelectedDate) return [];
+
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+
+    return [...getEventsForDate(mobileSelectedDate)].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1;
+      if (b.time) return 1;
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+  }, [mobileSelectedDate, getEventsForDate]);
+
+  const mobileSelectedDateLabel = useMemo(() => {
+    if (!mobileSelectedDate) return '';
+    return formatDateDisplay(parseDateString(mobileSelectedDate));
+  }, [mobileSelectedDate]);
+
+  const mobileGreeting = useMemo(() => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) {
+      return {
+        title: 'Good morning',
+        subtitle: 'Start with the plan that matters most today.',
+      };
+    }
+
+    if (hour < 18) {
+      return {
+        title: 'Good afternoon',
+        subtitle: 'Keep the day moving with a clear next step.',
+      };
+    }
+
+    return {
+      title: 'Good evening',
+      subtitle: 'Wrap up the day and set up tomorrow.',
+    };
+  }, [isMounted]);
+
+  const currentMonthEventCount = useMemo(() => {
+    return events.filter((event) => {
+      const eventDate = parseDateString(event.date);
+      return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+    }).length;
+  }, [events, currentMonth, currentYear]);
+
+  const completedMobileEvents = mobileSelectedEvents.filter((event) => event.completed).length;
+  const activeMobileEvents = mobileSelectedEvents.length - completedMobileEvents;
+
+  const handleOpenSelectedDay = () => {
+    setSelectedDate(mobileSelectedDate);
+    setIsEventListOpen(true);
+  };
+
+  const handleMobileAddEvent = () => {
+    setSelectedDate(mobileSelectedDate);
+    setMobilePanel('day');
+    setEditingEvent(null);
+    setIsEventListOpen(false);
+    setIsEventModalOpen(true);
+  };
+
   // Show landing page for unauthenticated users
   if (!authLoading && !isAuthenticated) {
     return <LandingPage />;
@@ -436,8 +513,288 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col">
+        <div className="sm:hidden flex-1 px-4 pt-4 pb-28">
+          <div className="mx-auto flex max-w-md flex-col gap-4">
+            <section className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.08] via-cyan-500/[0.08] to-violet-500/[0.08] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300/70">Today</p>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold text-white">{mobileGreeting.title}</h2>
+                  <p className="mt-1 max-w-[240px] text-sm leading-relaxed text-white/50">{mobileGreeting.subtitle}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-right">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Selected</p>
+                  <p className="mt-1 text-sm font-medium text-white">{mobileSelectedEvents.length} events</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/10 bg-[#0a0b14]/90 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300/70">Revo Mobile</p>
+                  <h1 className="mt-2 text-2xl font-semibold text-white">{MONTHS[currentMonth]}</h1>
+                  <p className="text-sm text-white/40">{currentYear} agenda</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isSyncing && (
+                    <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-2 text-cyan-300">
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    </div>
+                  )}
+                  <UserMenu />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/18 via-violet-500/12 to-transparent p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/55">Selected day</p>
+                    <p className="mt-2 text-lg font-semibold text-white">{mobileSelectedDateLabel}</p>
+                    <p className="mt-1 text-sm text-white/45">{activeMobileEvents} active, {completedMobileEvents} completed</p>
+                  </div>
+                  <button
+                    onClick={handleMobileAddEvent}
+                    className="rounded-2xl bg-white text-slate-950 px-4 py-2.5 text-sm font-semibold shadow-lg shadow-white/10 transition-transform active:scale-95"
+                  >
+                    New
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="rounded-2xl bg-black/20 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Today</p>
+                    <p className="mt-1 text-lg font-semibold text-white">{stats.todayCount}</p>
+                  </div>
+                  <div className="rounded-2xl bg-black/20 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Month</p>
+                    <p className="mt-1 text-lg font-semibold text-white">{currentMonthEventCount}</p>
+                  </div>
+                  <div className="rounded-2xl bg-black/20 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Done</p>
+                    <p className="mt-1 text-lg font-semibold text-white">{stats.completionRate}%</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <SearchBar
+                  events={events}
+                  onEventClick={handleEditEvent}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center">
+                <div />
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setNav((prev) => prev - 1)}
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/70 transition-all active:scale-95"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setNav(0)}
+                    className="rounded-2xl border border-cyan-500/20 bg-cyan-500/12 px-4 py-3 text-sm font-medium text-cyan-200 transition-all active:scale-95"
+                  >
+                    This month
+                  </button>
+                  <button
+                    onClick={() => setNav((prev) => prev + 1)}
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/70 transition-all active:scale-95"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex justify-end">
+                {isAuthenticated && encryptionSetup && (
+                  <button
+                    onClick={() => !encryptionUnlocked && setShowEncryptionModal(true)}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                      encryptionUnlocked
+                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+                        : 'border-amber-500/25 bg-amber-500/10 text-amber-300'
+                    }`}
+                  >
+                    {encryptionUnlocked ? 'Secure' : 'Unlock'}
+                  </button>
+                )}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/10 bg-[#090b13]/88 p-3 backdrop-blur-2xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+              <Calendar
+                nav={nav}
+                events={events}
+                onDayClick={handleDayClick}
+                selectedDate={mobileSelectedDate}
+              />
+            </section>
+
+            <section className="rounded-[28px] border border-white/10 bg-[#090b13]/92 p-3 backdrop-blur-2xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+              <div className="mb-3 flex rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+                {([
+                  { key: 'day', label: 'Day' },
+                  { key: 'tools', label: 'Tools' },
+                  { key: 'stats', label: 'Stats' },
+                ] as const).map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setMobilePanel(item.key)}
+                    className={`flex-1 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all ${
+                      mobilePanel === item.key
+                        ? 'bg-white text-slate-950 shadow-lg shadow-white/10'
+                        : 'text-white/55'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {mobilePanel === 'day' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-violet-300/70">Agenda</p>
+                      <h2 className="mt-1 text-lg font-semibold text-white">{mobileSelectedDateLabel}</h2>
+                    </div>
+                    <button
+                      onClick={handleOpenSelectedDay}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/75"
+                    >
+                      Full day
+                    </button>
+                  </div>
+
+                  {mobileSelectedEvents.length === 0 ? (
+                    <div className="rounded-[24px] border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center">
+                      <p className="text-sm text-white/60">Nothing booked for this day.</p>
+                      <p className="mt-1 text-xs text-white/30">Use the add button to schedule something.</p>
+                    </div>
+                  ) : (
+                    mobileSelectedEvents.map((event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => handleEditEvent(event)}
+                        className="w-full rounded-[24px] border border-white/10 bg-black/20 p-4 text-left transition-all active:scale-[0.99]"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="mt-1 h-3 w-3 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: event.color }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{CATEGORY_CONFIG[event.category].icon}</span>
+                              <p className={`truncate text-sm font-semibold ${event.completed ? 'text-white/40 line-through' : 'text-white'}`}>
+                                {event.title}
+                              </p>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 text-xs text-white/45">
+                              <span>{event.time ? formatTime(event.time) : 'Any time'}</span>
+                              <span
+                                className="rounded-full px-2 py-1 font-medium"
+                                style={{
+                                  backgroundColor: `${PRIORITY_CONFIG[event.priority].color}20`,
+                                  color: PRIORITY_CONFIG[event.priority].color,
+                                }}
+                              >
+                                {PRIORITY_CONFIG[event.priority].label}
+                              </span>
+                            </div>
+                            {event.description && (
+                              <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/35">{event.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {mobilePanel === 'tools' && (
+                <div className="space-y-3">
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-3">
+                    <WeatherWidget />
+                  </div>
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-3">
+                    <FocusTimer
+                      alarmSound={settings.alarmSound}
+                      onAlarmSoundChange={(sound) => updateSettings({ alarmSound: sound })}
+                    />
+                  </div>
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-3">
+                    <SpotifyWidget />
+                  </div>
+                </div>
+              )}
+
+              {mobilePanel === 'stats' && (
+                <div className="space-y-3">
+                  <QuickStats stats={stats} />
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                    <TimezoneSelector
+                      timezone={settings.timezone}
+                      onTimezoneChange={(tz) => updateSettings({ timezone: tz })}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#070910]/92 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3 backdrop-blur-2xl">
+            <div className="mx-auto flex max-w-md items-center gap-2 rounded-[26px] border border-white/10 bg-white/[0.03] p-2 shadow-[0_12px_40px_rgba(0,0,0,0.3)]">
+              {([
+                { key: 'day', label: 'Agenda' },
+                { key: 'tools', label: 'Tools' },
+                { key: 'stats', label: 'Stats' },
+              ] as const).map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setMobilePanel(item.key)}
+                  className={`flex-1 rounded-[18px] px-3 py-3 text-sm font-medium transition-all ${
+                    mobilePanel === item.key
+                      ? 'bg-white text-slate-950'
+                      : 'text-white/55'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <button
+                onClick={() => router.push('/notes')}
+                className="rounded-[18px] px-3 py-3 text-sm font-medium text-white/55 transition-all"
+              >
+                Notes
+              </button>
+              <button
+                onClick={handleMobileAddEvent}
+                className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-gradient-to-br from-cyan-400 to-violet-500 text-slate-950 shadow-lg shadow-cyan-500/25 transition-transform active:scale-95"
+                title="Add event"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Header */}
-        <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5">
+        <header className="hidden sm:block px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
             {/* Logo & Title */}
             <div className="flex flex-col flex-shrink-0">
@@ -497,17 +854,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Mobile Stats Toggle */}
-              <button
-                onClick={() => setShowMobileStats(!showMobileStats)}
-                className="lg:hidden p-2 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all"
-                title="Toggle Stats"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </button>
-              
               <button
                 onClick={handleQuickAddEvent}
                 className="btn-primary flex items-center gap-2"
@@ -524,33 +870,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Mobile Search Bar */}
-          <div className="sm:hidden mt-3">
-            <SearchBar 
-              events={events}
-              onEventClick={handleEditEvent}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-            />
-          </div>
         </header>
-
-        {/* Mobile Stats Dropdown */}
-        {showMobileStats && (
-          <div className="lg:hidden px-4 py-3 border-b border-white/5 slide-in-up">
-            <QuickStats stats={stats} />
-          </div>
-        )}
-
-        {/* Mobile Weather, Focus Timer & Spotify */}
-        <div className="lg:hidden px-4 space-y-4">
-          <WeatherWidget />
-          <FocusTimer
-            alarmSound={settings.alarmSound}
-            onAlarmSoundChange={(sound) => updateSettings({ alarmSound: sound })}
-          />
-          <SpotifyWidget />
-        </div>
 
         {/* Loading Overlay */}
         {isLoading && (
@@ -563,7 +883,7 @@ export default function Home() {
         )}
 
         {/* Main Layout */}
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
+        <main className="hidden sm:block flex-1 p-3 sm:p-4 lg:p-6 pt-8 sm:pt-10 lg:pt-12">
           <div className="max-w-7xl mx-auto">
             {/* Timezone Selector - Top of content */}
             <div className="mb-4">
@@ -627,12 +947,110 @@ export default function Home() {
                   </div>
                 </div>
 
+                <div className="sm:hidden mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300/80">Selected Day</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{mobileSelectedDateLabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-white">{mobileSelectedEvents.length}</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">events</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[11px] text-white/45">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
+                      {currentMonthEventCount} this month
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
+                      {completedMobileEvents} done
+                    </span>
+                  </div>
+                </div>
+
                 {/* Calendar Grid */}
                 <Calendar
                   nav={nav}
                   events={events}
                   onDayClick={handleDayClick}
+                  selectedDate={mobileSelectedDate}
                 />
+
+                <div className="mt-4 sm:hidden rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300/80">Mobile Agenda</p>
+                      <h3 className="mt-1 text-base font-semibold text-white">{mobileSelectedDateLabel}</h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleOpenSelectedDay}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-all hover:bg-white/10"
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={handleMobileAddEvent}
+                        className="rounded-xl border border-cyan-500/30 bg-cyan-500/15 px-3 py-2 text-xs font-medium text-cyan-200 transition-all hover:bg-cyan-500/25"
+                      >
+                        Add Event
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {mobileSelectedEvents.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-white/10 bg-[#06070d] px-4 py-5 text-center">
+                        <p className="text-sm text-white/55">No events scheduled</p>
+                        <p className="mt-1 text-xs text-white/30">Pick another day or add a new event here.</p>
+                      </div>
+                    ) : (
+                      mobileSelectedEvents.slice(0, 4).map((event) => (
+                        <button
+                          key={event.id}
+                          onClick={() => handleEditEvent(event)}
+                          className="w-full rounded-xl border border-white/10 bg-[#06070d] p-3 text-left transition-all hover:border-white/20 hover:bg-white/[0.04]"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                              style={{ backgroundColor: event.color }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{CATEGORY_CONFIG[event.category].icon}</span>
+                                <p className={`truncate text-sm font-medium ${event.completed ? 'text-white/45 line-through' : 'text-white'}`}>
+                                  {event.title}
+                                </p>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2 text-[11px] text-white/45">
+                                <span>{event.time ? formatTime(event.time) : 'Any time'}</span>
+                                <span
+                                  className="rounded-full px-1.5 py-0.5 font-medium"
+                                  style={{
+                                    backgroundColor: `${PRIORITY_CONFIG[event.priority].color}20`,
+                                    color: PRIORITY_CONFIG[event.priority].color,
+                                  }}
+                                >
+                                  {PRIORITY_CONFIG[event.priority].label}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {mobileSelectedEvents.length > 4 && (
+                    <button
+                      onClick={handleOpenSelectedDay}
+                      className="mt-3 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition-all hover:bg-white/10"
+                    >
+                      View {mobileSelectedEvents.length - 4} more
+                    </button>
+                  )}
+                </div>
               </div>
               
               {/* Spotify Widget - Below Calendar (Desktop only, mobile has it above) */}

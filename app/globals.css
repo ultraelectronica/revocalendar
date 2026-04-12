@@ -305,6 +305,34 @@ body {
     pointer-events: none;
     opacity: 0.4;
   }
+
+  .legal-content section {
+    @apply mb-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6;
+  }
+
+  .legal-content section:last-child {
+    @apply mb-0;
+  }
+
+  .legal-content h2 {
+    @apply mb-3 text-lg font-semibold text-white;
+  }
+
+  .legal-content p {
+    @apply text-sm leading-7 text-white/65;
+  }
+
+  .legal-content strong {
+    @apply font-semibold text-white/85;
+  }
+
+  .legal-content ul {
+    @apply ml-2 list-disc space-y-2 pl-4 text-sm text-white/65;
+  }
+
+  .legal-content a {
+    @apply text-cyan-400 transition-colors hover:text-cyan-300;
+  }
 }
 
 /* Mono font for times/numbers */
