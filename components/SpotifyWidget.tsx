@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useSpotify } from '@/hooks/useSpotify';
 import { useAuth } from '@/hooks/useAuth';
 
+const VISUALIZER_BAR_HEIGHTS = ['35%', '70%', '100%', '65%', '45%'] as const;
+const VISUALIZER_BAR_DURATIONS = ['0.45s', '0.62s', '0.5s', '0.68s', '0.56s'] as const;
+
 // Vinyl record animation component (for mini view)
 function VinylRecord({ 
   albumArt, 
@@ -504,9 +507,9 @@ function AudioVisualizer({ isPlaying, color }: { isPlaying: boolean; color: stri
           }`}
           style={{
             backgroundColor: color,
-            height: isPlaying ? `${Math.random() * 100}%` : '25%',
+            height: isPlaying ? VISUALIZER_BAR_HEIGHTS[i] : '25%',
             animationDelay: `${i * 0.1}s`,
-            animationDuration: `${0.4 + Math.random() * 0.3}s`,
+            animationDuration: VISUALIZER_BAR_DURATIONS[i],
           }}
         />
       ))}
@@ -1099,4 +1102,3 @@ export default function SpotifyWidget() {
     </>
   );
 }
-

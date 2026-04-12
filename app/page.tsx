@@ -251,6 +251,48 @@ function UserMenu() {
   );
 }
 
+function DashboardLoadingShell() {
+  return (
+    <div className="min-h-screen bg-[#05050A]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between rounded-[28px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-2xl">
+          <div className="space-y-3">
+            <div className="h-3 w-24 animate-pulse rounded-full bg-white/10" />
+            <div className="h-8 w-56 animate-pulse rounded-full bg-white/10" />
+          </div>
+          <div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="h-8 w-40 animate-pulse rounded-full bg-white/10" />
+              <div className="h-10 w-28 animate-pulse rounded-2xl bg-white/10" />
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 42 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-20 animate-pulse rounded-2xl bg-white/[0.05]"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-36 animate-pulse rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [nav, setNav] = useState(0);
@@ -494,6 +536,10 @@ export default function Home() {
     setIsEventListOpen(false);
     setIsEventModalOpen(true);
   };
+
+  if (!isMounted || authLoading) {
+    return <DashboardLoadingShell />;
+  }
 
   // Show landing page for unauthenticated users
   if (!authLoading && !isAuthenticated) {
