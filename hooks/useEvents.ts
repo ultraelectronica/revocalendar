@@ -6,6 +6,26 @@ import { createClient, DbEvent } from '@/lib/supabase';
 
 // Fields to encrypt in events
 const ENCRYPTED_EVENT_FIELDS: (keyof CalendarEvent)[] = ['title', 'description'];
+const SAVE_DEBOUNCE_MS = 150;
+const DB_OPERATION_TIMEOUT_MS = 8000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+type SupabaseMutationResult = { error: { message?: string } | null };
 
 // Map database event to local CalendarEvent type
 function mapDbEventToLocal(dbEvent: DbEvent): CalendarEvent {
@@ -50,6 +70,7 @@ interface EncryptionHelpers {
   decrypt: (value: string) => Promise<string>;
   encryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
   decryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  isSetup?: boolean;
   isUnlocked: boolean;
 }
 
@@ -75,6 +96,14 @@ export function useEvents(options: UseEventsOptions = {}) {
   // Use ref for encryption to avoid dependency changes triggering refetch
   const encryptionRef = useRef(encryption);
   encryptionRef.current = encryption;
+
+  const encryptionIsSetup = encryption?.isSetup ?? false;
+  const encryptionIsUnlocked = encryption?.isUnlocked ?? false;
+
+  const canPersistEncryptedFields = useCallback(() => {
+    const enc = encryptionRef.current;
+    return !enc?.isSetup || enc.isUnlocked;
+  }, []);
 
   // Encrypt event sensitive fields (using stable ref)
   const encryptEvent = useCallback(async (event: CalendarEvent): Promise<CalendarEvent> => {
@@ -104,6 +133,10 @@ export function useEvents(options: UseEventsOptions = {}) {
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
     if (hasMigratedRef.current) return;
+
+    if (!canPersistEncryptedFields()) {
+      return;
+    }
     
     const supabase = supabaseRef.current;
     
@@ -139,7 +172,7 @@ export function useEvents(options: UseEventsOptions = {}) {
     }
     
     hasMigratedRef.current = true;
-  }, [encryptEvent]);
+  }, [encryptEvent, canPersistEncryptedFields]);
 
   // Fetch events from Supabase or localStorage
   // Only refetch when userId changes, not when encryption changes
@@ -153,6 +186,13 @@ export function useEvents(options: UseEventsOptions = {}) {
       setLoading(true);
 
       if (userId) {
+        if (!canPersistEncryptedFields()) {
+          if (isMounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
         // Migrate localStorage data if needed
         await migrateLocalToSupabase(userId);
 
@@ -228,10 +268,15 @@ export function useEvents(options: UseEventsOptions = {}) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, migrateLocalToSupabase, decryptEvents, decryptEvent]);
+  }, [userId, migrateLocalToSupabase, decryptEvents, decryptEvent, canPersistEncryptedFields, encryptionIsSetup, encryptionIsUnlocked]);
 
   const addEvent = useCallback(async (event: CalendarEvent) => {
     const supabase = supabaseRef.current;
+
+    if (userId && !canPersistEncryptedFields()) {
+      console.warn('Blocked event insert while encryption is locked.');
+      return;
+    }
 
     // Optimistically add to UI immediately
     setEvents(prev => [...prev, event]);
@@ -249,23 +294,27 @@ export function useEvents(options: UseEventsOptions = {}) {
           // Encrypt before saving
           const encryptedEvent = await encryptEvent(event);
           
-          const { error } = await supabase
-            .from('events')
-            .insert({
-              ...mapLocalEventToDb(encryptedEvent, userId),
-              id: event.id,
-            })
-            .select()
-            .single();
+          const { error } = await withTimeout<SupabaseMutationResult>(
+            Promise.resolve(
+              supabase
+                .from('events')
+                .insert({
+                  ...mapLocalEventToDb(encryptedEvent, userId),
+                  id: event.id,
+                })
+            ),
+            DB_OPERATION_TIMEOUT_MS,
+            'Timed out while saving event'
+          );
 
           if (error) {
-            // Rollback on error
+            // Keep a local fallback so the user's event is not lost on transient network issues
+            saveEvents([...eventsRef.current, event]);
             console.error('Failed to add event:', error);
-            setEvents(prev => prev.filter(e => e.id !== event.id));
           }
         } catch (error) {
           console.error('Error adding event:', error);
-          setEvents(prev => prev.filter(e => e.id !== event.id));
+          saveEvents([...eventsRef.current, event]);
         } finally {
           pendingOpsRef.current.delete(opKey);
           setSyncing(pendingOpsRef.current.size > 0);
@@ -276,10 +325,15 @@ export function useEvents(options: UseEventsOptions = {}) {
       const newEvents = [...events, event];
       saveEvents(newEvents);
     }
-  }, [userId, events, encryptEvent]);
+  }, [userId, events, encryptEvent, canPersistEncryptedFields]);
 
   const updateEvent = useCallback(async (eventId: string, updatedEvent: CalendarEvent) => {
     const supabase = supabaseRef.current;
+
+    if (userId && !canPersistEncryptedFields()) {
+      console.warn('Blocked event update while encryption is locked.');
+      return;
+    }
     
     // Store previous event for potential rollback
     const previousEvent = events.find(e => e.id === eventId);
@@ -294,7 +348,7 @@ export function useEvents(options: UseEventsOptions = {}) {
         clearTimeout(existingTimer);
       }
 
-      // Debounce rapid sequential updates (300ms)
+      // Debounce rapid sequential updates without making saves feel laggy
       const timer = setTimeout(async () => {
         debounceTimersRef.current.delete(eventId);
         
@@ -314,25 +368,31 @@ export function useEvents(options: UseEventsOptions = {}) {
           // Encrypt before saving
           const encryptedEvent = await encryptEvent(currentEvent);
           
-          const { error } = await supabase
-            .from('events')
-            .update({
-              date: encryptedEvent.date,
-              title: encryptedEvent.title,
-              time: encryptedEvent.time,
-              end_time: encryptedEvent.endTime,
-              description: encryptedEvent.description,
-              color: encryptedEvent.color,
-              category: encryptedEvent.category,
-              is_recurring: encryptedEvent.isRecurring,
-              recurrence_pattern: encryptedEvent.recurrencePattern,
-              priority: encryptedEvent.priority,
-              completed: encryptedEvent.completed,
-              reminder: encryptedEvent.reminder,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', eventId)
-            .eq('user_id', userId);
+          const { error } = await withTimeout<SupabaseMutationResult>(
+            Promise.resolve(
+              supabase
+                .from('events')
+                .update({
+                  date: encryptedEvent.date,
+                  title: encryptedEvent.title,
+                  time: encryptedEvent.time,
+                  end_time: encryptedEvent.endTime,
+                  description: encryptedEvent.description,
+                  color: encryptedEvent.color,
+                  category: encryptedEvent.category,
+                  is_recurring: encryptedEvent.isRecurring,
+                  recurrence_pattern: encryptedEvent.recurrencePattern,
+                  priority: encryptedEvent.priority,
+                  completed: encryptedEvent.completed,
+                  reminder: encryptedEvent.reminder,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', eventId)
+                .eq('user_id', userId)
+            ),
+            DB_OPERATION_TIMEOUT_MS,
+            'Timed out while updating event'
+          );
 
           if (error) {
             // Rollback on error
@@ -350,7 +410,7 @@ export function useEvents(options: UseEventsOptions = {}) {
           pendingOpsRef.current.delete(eventId);
           setSyncing(pendingOpsRef.current.size > 0);
         }
-      }, 300);
+      }, SAVE_DEBOUNCE_MS);
 
       debounceTimersRef.current.set(eventId, timer);
     } else {
@@ -358,7 +418,7 @@ export function useEvents(options: UseEventsOptions = {}) {
       const newEvents = events.map(e => e.id === eventId ? updatedEvent : e);
       saveEvents(newEvents);
     }
-  }, [userId, events, encryptEvent]);
+  }, [userId, events, encryptEvent, canPersistEncryptedFields]);
 
   const deleteEvent = useCallback(async (eventId: string) => {
     const supabase = supabaseRef.current;
@@ -379,11 +439,17 @@ export function useEvents(options: UseEventsOptions = {}) {
         setSyncing(true);
         
         try {
-          const { error } = await supabase
-            .from('events')
-            .delete()
-            .eq('id', eventId)
-            .eq('user_id', userId);
+          const { error } = await withTimeout<SupabaseMutationResult>(
+            Promise.resolve(
+              supabase
+                .from('events')
+                .delete()
+                .eq('id', eventId)
+                .eq('user_id', userId)
+            ),
+            DB_OPERATION_TIMEOUT_MS,
+            'Timed out while deleting event'
+          );
 
           if (error) {
             // Rollback on error

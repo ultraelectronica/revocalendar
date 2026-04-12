@@ -13,6 +13,8 @@ const STORAGE_KEY = 'weather_location';
 const WEATHER_CACHE_KEY = 'weather_data_cache';
 const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - same as refresh interval
+const GEOLOCATION_TIMEOUT_MS = 4000;
+const WEATHER_FETCH_TIMEOUT_MS = 5000;
 
 export interface WeatherLocation {
   lat: number;
@@ -157,7 +159,12 @@ export function useWeather(): UseWeatherReturn {
         }
       }
       
-      const response = await fetch(`/api/weather?lat=${loc.lat}&lon=${loc.lon}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), WEATHER_FETCH_TIMEOUT_MS);
+      const response = await fetch(`/api/weather?lat=${loc.lat}&lon=${loc.lon}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error('Failed to fetch weather data');
@@ -209,7 +216,7 @@ export function useWeather(): UseWeatherReturn {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: false,
-          timeout: 10000,
+          timeout: GEOLOCATION_TIMEOUT_MS,
           maximumAge: 300000, // 5 minutes
         });
       });
@@ -237,8 +244,16 @@ export function useWeather(): UseWeatherReturn {
 
   // Initialize on mount
   useEffect(() => {
+    const cachedDefault = getCachedWeather(DEFAULT_LOCATION);
+    if (cachedDefault) {
+      setWeather(cachedDefault);
+      setLoading(false);
+    } else {
+      fetchWeather(DEFAULT_LOCATION);
+    }
+
     requestLocation();
-  }, [requestLocation]);
+  }, [requestLocation, fetchWeather, getCachedWeather]);
 
   // Auto-refresh interval (only fetches if cache is expired)
   useEffect(() => {

@@ -10,7 +10,8 @@ import {
 } from '@/utils/noteBlocks';
 
 // Fields to encrypt in notes
-const ENCRYPTED_NOTE_FIELDS: (keyof Note)[] = ['content'];
+const ENCRYPTED_NOTE_FIELDS: (keyof Note)[] = ['content', 'title'];
+const SAVE_DEBOUNCE_MS = 150;
 
 // Map database note to local Note type
 function mapDbNoteToLocal(dbNote: DbNote): Note {
@@ -45,6 +46,7 @@ interface EncryptionHelpers {
   decrypt: (value: string) => Promise<string>;
   encryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
   decryptFields: <T extends object>(obj: T, fields: (keyof T)[]) => Promise<T>;
+  isSetup?: boolean;
   isUnlocked: boolean;
 }
 
@@ -71,6 +73,11 @@ export function useNotes(options: UseNotesOptions = {}) {
   // Use ref for encryption to avoid dependency changes triggering refetch
   const encryptionRef = useRef(encryption);
   encryptionRef.current = encryption;
+
+  const canAccessEncryptedFields = useCallback(() => {
+    const enc = encryptionRef.current;
+    return !enc?.isSetup || enc.isUnlocked;
+  }, []);
 
   // Encrypt note sensitive fields (using stable ref)
   const encryptNote = useCallback(async (note: Note): Promise<Note> => {
@@ -114,6 +121,8 @@ export function useNotes(options: UseNotesOptions = {}) {
   // Migrate localStorage data to Supabase (one-time)
   const migrateLocalToSupabase = useCallback(async (uid: string) => {
     if (hasMigratedRef.current) return;
+
+    if (!canAccessEncryptedFields()) return;
     
     try {
       const supabase = supabaseRef.current;
@@ -142,7 +151,7 @@ export function useNotes(options: UseNotesOptions = {}) {
               id: n.id,
               user_id: uid,
               content: encrypted.content,
-              title: n.title ?? 'Untitled',
+              title: encrypted.title,
               pinned: n.pinned,
               color: n.color,
               created_at: n.createdAt,
@@ -162,7 +171,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         console.error('Error migrating notes:', error);
       }
     }
-  }, [encryptNote]);
+  }, [encryptNote, canAccessEncryptedFields]);
 
   // Fetch notes from Supabase or localStorage
   // Only refetch when userId changes, not when encryption changes
@@ -177,6 +186,13 @@ export function useNotes(options: UseNotesOptions = {}) {
 
       try {
         if (userId) {
+          if (!canAccessEncryptedFields()) {
+            if (isMounted) {
+              setLoading(false);
+            }
+            return;
+          }
+
           // Migrate localStorage data if needed
           await migrateLocalToSupabase(userId);
 
@@ -300,7 +316,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         }
       }
     };
-  }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote]);
+  }, [userId, migrateLocalToSupabase, decryptNotes, decryptNote, canAccessEncryptedFields, encryption?.isSetup, encryption?.isUnlocked]);
 
   const saveNoteNow = useCallback(async (
     noteId: string,
@@ -375,9 +391,12 @@ export function useNotes(options: UseNotesOptions = {}) {
       beginOp(opKey);
       try {
         const updateData: Record<string, unknown> = {
-          title: resolvedTitle,
           updated_at: now,
         };
+
+        updateData.title = encryption?.isUnlocked
+          ? await encryption.encrypt(resolvedTitle)
+          : resolvedTitle;
 
         if (contentToSave !== undefined) {
           const encryptedContent = encryption?.isUnlocked
@@ -463,7 +482,7 @@ export function useNotes(options: UseNotesOptions = {}) {
               id,
               user_id: userId,
               content: encryptedNote.content,
-              title: newNote.title,
+              title: encryptedNote.title,
               pinned: false,
               color,
             })
@@ -534,7 +553,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         clearTimeout(existingTimer);
       }
 
-      // Debounce rapid sequential updates (300ms)
+      // Debounce rapid sequential updates without making saves feel laggy
       const timer = setTimeout(async () => {
         debounceTimersRef.current.delete(noteId);
         
@@ -575,7 +594,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         } finally {
           endOp(noteId);
         }
-      }, 300);
+      }, SAVE_DEBOUNCE_MS);
 
       debounceTimersRef.current.set(noteId, timer);
     } else {
@@ -774,7 +793,7 @@ export function useNotes(options: UseNotesOptions = {}) {
         clearTimeout(existingTimer);
       }
 
-      // Debounce rapid sequential updates (300ms)
+      // Debounce rapid sequential updates without making saves feel laggy
       const timer = setTimeout(async () => {
         debounceTimersRef.current.delete(`title-${noteId}`);
         
@@ -787,11 +806,15 @@ export function useNotes(options: UseNotesOptions = {}) {
         try {
           const currentNote = notesRef.current.find(n => n.id === noteId);
           const titleToSave = currentNote?.title ?? title;
+          const resolvedTitle = titleToSave?.trim() ? titleToSave.trim() : 'Untitled';
+          const encryptedTitle = encryption?.isUnlocked
+            ? await encryption.encrypt(resolvedTitle)
+            : resolvedTitle;
           
           const { error } = await supabase
             .from('notes')
             .update({
-              title: titleToSave ?? 'Untitled',
+              title: encryptedTitle,
               updated_at: new Date().toISOString(),
             })
             .eq('id', noteId)
@@ -806,7 +829,7 @@ export function useNotes(options: UseNotesOptions = {}) {
           pendingOpsRef.current.delete(opKey);
           setSyncing(pendingOpsRef.current.size > 0);
         }
-      }, 300);
+      }, SAVE_DEBOUNCE_MS);
 
       debounceTimersRef.current.set(`title-${noteId}`, timer);
     } else {
