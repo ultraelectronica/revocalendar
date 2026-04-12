@@ -456,8 +456,8 @@ export function useAuthProvider() {
     setSigningOut(true);
     
     try {
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      // Local sign-out avoids the slower global revocation path during normal logout.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       
       if (error) {
         console.error('Error signing out:', error);
@@ -482,9 +482,6 @@ export function useAuthProvider() {
       //   console.warn('Could not clear localStorage:', e);
       // }
 
-      // Small delay to ensure state updates propagate
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       setSigningOut(false);
       return { error: null };
     } catch (err) {

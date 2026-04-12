@@ -2,6 +2,10 @@ import { createMiddlewareClient } from '@/lib/supabase-server';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  if (/\.[^/]+$/.test(request.nextUrl.pathname) || request.nextUrl.pathname === '/flutter_service_worker.js') {
+    return NextResponse.next();
+  }
+
   const referer = request.headers.get('referer') || '';
   const isResetPasswordFlow =
     request.nextUrl.pathname === '/reset-password' || referer.includes('/reset-password');
@@ -31,7 +35,7 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    if (user) {
+    if (user && process.env.NODE_ENV === 'development') {
       console.log('[Middleware] User authenticated:', user.email);
     }
   } catch (e) {
@@ -43,6 +47,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|favicon.svg|reset-password|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|favicon.svg|reset-password|.*\\..*$).*)',
   ],
 };

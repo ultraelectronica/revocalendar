@@ -9,9 +9,10 @@ interface CalendarProps {
   nav: number;
   events: CalendarEvent[];
   onDayClick: (date: string) => void;
+  selectedDate?: string | null;
 }
 
-export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
+export default function Calendar({ nav, events, onDayClick, selectedDate }: CalendarProps) {
   const [isMounted, setIsMounted] = useState(false);
 
   // Track client-side mounting to prevent hydration mismatch
@@ -59,6 +60,7 @@ export default function Calendar({ nav, events, onDayClick }: CalendarProps) {
             date={dayData.date}
             isToday={dayData.isToday}
             isCurrentMonth={dayData.isCurrentMonth}
+            isSelected={Boolean(dayData.date && selectedDate === dayData.date)}
             events={dayData.date ? events.filter(e => e.date === dayData.date) : []}
             onClick={() => dayData.date && onDayClick(dayData.date)}
             animationDelay={index * 10}
