@@ -195,6 +195,15 @@ export default function Orb({
     const container = ctnDom.current;
     if (!container) return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+    const isSmallViewport = window.innerWidth < 768;
+    const shouldUseMobileProfile = prefersReducedMotion || isTouchDevice || isSmallViewport;
+    const maxDpr = shouldUseMobileProfile ? 1.25 : 2;
+    const minFrameInterval = shouldUseMobileProfile ? 1000 / 45 : 0;
+    let isVisible = !document.hidden;
+    let isIntersecting = true;
+
     const renderer = new Renderer({ alpha: true, premultipliedAlpha: false });
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -219,9 +228,17 @@ export default function Orb({
 
     const mesh = new Mesh(gl, { geometry, program });
 
+    const intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        isIntersecting = entries[0]?.isIntersecting ?? true;
+      },
+      { threshold: 0.01 }
+    );
+    intersectionObserver.observe(container);
+
     function resize() {
       if (!container) return;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       const width = container.clientWidth;
       const height = container.clientHeight;
       renderer.setSize(width * dpr, height * dpr);
@@ -229,11 +246,18 @@ export default function Orb({
       gl.canvas.style.height = height + 'px';
       program.uniforms.iResolution.value.set(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height);
     }
+
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden;
+    };
+
     window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     resize();
 
     let targetHover = 0;
     let lastTime = 0;
+    let lastRenderTime = 0;
     let currentRot = 0;
     const rotationSpeed = 0.1;
 
@@ -260,14 +284,27 @@ export default function Orb({
       targetHover = 0;
     };
 
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
+    if (!isTouchDevice) {
+      container.addEventListener('mousemove', handleMouseMove);
+      container.addEventListener('mouseleave', handleMouseLeave);
+    }
 
     let rafId: number;
     const update = (t: number) => {
       rafId = requestAnimationFrame(update);
+
+      if (!isVisible || !isIntersecting) {
+        lastTime = t;
+        return;
+      }
+
+      if (minFrameInterval > 0 && lastRenderTime !== 0 && t - lastRenderTime < minFrameInterval) {
+        return;
+      }
+
       const dt = (t - lastTime) * 0.001;
       lastTime = t;
+      lastRenderTime = t;
       program.uniforms.iTime.value = t * 0.0004;
       program.uniforms.hue.value = hue;
       program.uniforms.hoverIntensity.value = hoverIntensity;
@@ -288,6 +325,8 @@ export default function Orb({
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      intersectionObserver.disconnect();
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('mouseleave', handleMouseLeave);
       container.removeChild(gl.canvas);

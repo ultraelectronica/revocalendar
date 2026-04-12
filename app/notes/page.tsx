@@ -1,14 +1,17 @@
+
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useEncryption } from '@/hooks/useEncryption';
 import { useNotes } from '@/hooks/useNotes';
 import NotesPage from '@/components/NotesPage';
+import EncryptionModal from '@/components/EncryptionModal';
 
 export default function NotesRoute() {
   const router = useRouter();
+  const [showEncryptionModal, setShowEncryptionModal] = useState(false);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
 
@@ -32,9 +35,10 @@ export default function NotesRoute() {
       decrypt,
       encryptFields,
       decryptFields,
+      isSetup: encryptionSetup,
       isUnlocked: encryptionUnlocked,
     };
-  }, [isAuthenticated, encrypt, decrypt, encryptFields, decryptFields, encryptionUnlocked]);
+  }, [isAuthenticated, encrypt, decrypt, encryptFields, decryptFields, encryptionSetup, encryptionUnlocked]);
 
   // Notes hook
   const { 
@@ -58,17 +62,30 @@ export default function NotesRoute() {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  useEffect(() => {
+    if (isAuthenticated && !encryptionLoading && encryptionSetup && !encryptionUnlocked) {
+      setShowEncryptionModal(true);
+    }
+  }, [isAuthenticated, encryptionLoading, encryptionSetup, encryptionUnlocked]);
+
   // Show landing page if not authenticated
   if (!isAuthenticated && !authLoading) {
     return null;
   }
 
   // Show loading state
-  if (authLoading || notesLoading || encryptionLoading) {
+  if (authLoading || notesLoading || encryptionLoading || (encryptionSetup && !encryptionUnlocked)) {
     return (
-      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
-        <div className="text-white/60">Loading...</div>
-      </div>
+      <>
+        <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+          <div className="text-white/60">Loading...</div>
+        </div>
+        <EncryptionModal
+          isOpen={showEncryptionModal}
+          onClose={() => router.push('/')}
+          onSuccess={() => setShowEncryptionModal(false)}
+        />
+      </>
     );
   }
 

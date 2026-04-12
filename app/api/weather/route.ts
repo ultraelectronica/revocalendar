@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const WEATHER_API_KEY = process.env.WEATHER_API || process.env.NEXT_PUBLIC_WEATHER_API;
 const WEATHER_API_BASE = 'https://api.weatherapi.com/v1';
+const WEATHER_REQUEST_TIMEOUT_MS = 4000;
 
 // Default location: Manila, Philippines
 const DEFAULT_LAT = 14.5995;
@@ -23,16 +24,18 @@ export async function GET(request: Request) {
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), WEATHER_REQUEST_TIMEOUT_MS);
+
     // Fetch current weather with forecast, air quality, and astronomy data
-    const response = await fetch(
-      `${WEATHER_API_BASE}/forecast.json?key=${WEATHER_API_KEY}&q=${lat},${lon}&days=3&aqi=yes`,
-      { 
-        next: { revalidate: 1800 }, // Cache for 30 minutes
-        headers: {
-          'Accept': 'application/json',
-        }
-      }
-    );
+    const response = await fetch(`${WEATHER_API_BASE}/forecast.json?key=${WEATHER_API_KEY}&q=${lat},${lon}&days=3&aqi=yes`, {
+      next: { revalidate: 1800 },
+      headers: {
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -97,10 +100,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json(weatherData);
   } catch (error) {
+    const isTimeout = error instanceof Error && error.name === 'AbortError';
     console.error('[Weather API] Fetch error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch weather data' },
-      { status: 500 }
+      { error: isTimeout ? 'Weather request timed out' : 'Failed to fetch weather data' },
+      { status: isTimeout ? 504 : 500 }
     );
   }
 }
