@@ -7,6 +7,7 @@ interface CalendarDayProps {
   date: string | null;
   isToday: boolean;
   isCurrentMonth: boolean;
+  isSelected: boolean;
   events: CalendarEvent[];
   onClick: () => void;
   animationDelay?: number;
@@ -17,12 +18,13 @@ export default function CalendarDay({
   date, 
   isToday, 
   isCurrentMonth, 
+  isSelected,
   events, 
   onClick,
   animationDelay = 0 
 }: CalendarDayProps) {
   if (day === null) {
-    return <div className="min-h-[60px] sm:min-h-[80px] lg:min-h-[90px] p-1 sm:p-2 opacity-30" />;
+    return <div className="min-h-[72px] sm:min-h-[80px] lg:min-h-[90px] p-1 sm:p-2 opacity-30" />;
   }
 
   const eventsToShow = events.slice(0, 2);
@@ -35,7 +37,7 @@ export default function CalendarDay({
       onClick={onClick}
       style={{ animationDelay: `${animationDelay}ms` }}
       className={`
-        min-h-[60px] sm:min-h-[80px] lg:min-h-[90px] p-1 sm:p-1.5 lg:p-2 rounded-lg sm:rounded-xl cursor-pointer
+        min-h-[72px] sm:min-h-[80px] lg:min-h-[90px] p-1.5 sm:p-1.5 lg:p-2 rounded-xl sm:rounded-xl cursor-pointer
         flex flex-col transition-all duration-300 fade-in
         group relative overflow-hidden
         ${isToday 
@@ -44,6 +46,7 @@ export default function CalendarDay({
             ? 'bg-white/[0.03] border border-white/10 hover:bg-white/[0.08] hover:border-white/20'
             : 'bg-transparent border border-transparent hover:bg-white/[0.03]'
         }
+        ${isSelected && !isToday ? 'border-violet-400/70 bg-violet-500/10 shadow-lg shadow-violet-500/10' : ''}
         hover:scale-[1.03] hover:shadow-lg active:scale-[0.97] active:shadow-md
       `}
     >
@@ -78,16 +81,20 @@ export default function CalendarDay({
       {/* Events */}
       <div className="relative flex-1 flex flex-col gap-0.5 overflow-hidden">
         {/* Mobile: Show dots for events */}
-        <div className="sm:hidden flex gap-0.5 flex-wrap">
+        <div className="sm:hidden flex items-center justify-between gap-1 mt-auto">
+          <div className="flex gap-0.5 flex-wrap">
           {events.slice(0, 4).map((event) => (
-          <div
-            key={event.id}
+            <div
+              key={event.id}
               className="w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: event.color }}
+              style={{ backgroundColor: event.color }}
             />
           ))}
-          {events.length > 4 && (
-            <span className="text-[8px] text-white/40">+{events.length - 4}</span>
+          </div>
+          {events.length > 0 && (
+            <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-medium text-white/60">
+              {events.length}
+            </span>
           )}
         </div>
 
