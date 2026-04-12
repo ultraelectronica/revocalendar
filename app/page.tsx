@@ -23,6 +23,7 @@ import { useEvents } from '@/hooks/useEvents';
 import { useNotes } from '@/hooks/useNotes';
 import { useSettings } from '@/hooks/useSettings';
 import { CalendarEvent, CATEGORY_CONFIG, PRIORITY_CONFIG } from '@/types';
+import { isEncrypted } from '@/lib/crypto';
 import { MONTHS, formatDateDisplay, formatTime, parseDateString } from '@/utils/dateUtils';
 
 // Removed SaturnLogo component
@@ -59,7 +60,15 @@ function UserMenu() {
     );
   }
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User';
+  const fallbackDisplayName =
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split('@')[0] ||
+    'User';
+  const displayName = profile?.display_name && !isEncrypted(profile.display_name)
+    ? profile.display_name
+    : fallbackDisplayName;
   const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
@@ -328,9 +337,10 @@ export default function Home() {
       decrypt,
       encryptFields,
       decryptFields,
+      isSetup: encryptionSetup,
       isUnlocked: encryptionUnlocked,
     };
-  }, [isAuthenticated, encrypt, decrypt, encryptFields, decryptFields, encryptionUnlocked]);
+  }, [isAuthenticated, encrypt, decrypt, encryptFields, decryptFields, encryptionSetup, encryptionUnlocked]);
 
   // Pass userId and encryption to hooks for Supabase sync
   const { 
@@ -427,12 +437,19 @@ export default function Home() {
   };
 
   const handleSaveEvent = (event: CalendarEvent) => {
+    if (isAuthenticated && encryptionSetup && !encryptionUnlocked) {
+      setShowEncryptionModal(true);
+      return false;
+    }
+
     if (editingEvent) {
       updateEvent(event.id, event);
     } else {
       addEvent(event);
     }
     setEditingEvent(null);
+
+    return true;
   };
 
   const handleDeleteEvent = (eventId: string) => {
@@ -549,8 +566,8 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col relative bg-[#05050A] overflow-hidden">
       {/* Orb Background */}
-      <div className="fixed top-0 left-0 w-full h-[1000px] z-0 overflow-hidden mix-blend-screen pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] opacity-40">
+      <div className="fixed top-0 left-0 w-full h-[720px] sm:h-[1000px] z-0 overflow-hidden pointer-events-none sm:mix-blend-screen">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[820px] h-[820px] sm:w-[1200px] sm:h-[1200px] opacity-25 sm:opacity-40">
           <Orb hue={280} hoverIntensity={0.3} backgroundColor="#05050A" />
         </div>
         <div className="absolute bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#05050A] via-[#05050A]/60 to-transparent" />

@@ -15,7 +15,7 @@ import { generateEventId, formatDateDisplay, parseDateString } from '@/utils/dat
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (event: CalendarEvent) => void;
+  onSave: (event: CalendarEvent) => boolean | Promise<boolean>;
   selectedDate: string | null;
   editingEvent: CalendarEvent | null;
 }
@@ -62,7 +62,7 @@ export default function EventModal({
   const dateObj = parseDateString(selectedDate);
   const formattedDate = formatDateDisplay(dateObj);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
       setError(true);
       return;
@@ -84,8 +84,10 @@ export default function EventModal({
       reminder: null,
     };
 
-    onSave(event);
-    onClose();
+    const shouldClose = await onSave(event);
+    if (shouldClose !== false) {
+      onClose();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
