@@ -11,7 +11,12 @@ import {
   decrypt,
   encryptFields,
   decryptFields,
+  isEncrypted,
 } from '@/lib/crypto';
+
+const PROFILE_ENCRYPTED_FIELDS = ['email', 'display_name'] as const;
+type EncryptedProfileField = (typeof PROFILE_ENCRYPTED_FIELDS)[number];
+type EncryptedProfileSubset = Record<EncryptedProfileField, string | null>;
 
 interface EncryptionState {
   isSetup: boolean;        // Has encryption been set up for this user
@@ -56,6 +61,7 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
   const encryptionKeyRef = useRef<CryptoKey | null>(null);
   const saltRef = useRef<string | null>(null);
   const supabaseRef = useRef(createClient());
+  const hasMigratedProfileRef = useRef(false);
 
   const isMissingColumnError = (error: unknown) => {
     return (
@@ -77,6 +83,7 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
       });
       encryptionKeyRef.current = null;
       saltRef.current = null;
+      hasMigratedProfileRef.current = false;
       return;
     }
 
@@ -156,6 +163,66 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
 
     checkEncryptionSetup();
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !state.isUnlocked || !encryptionKeyRef.current || hasMigratedProfileRef.current) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const migrateProfileFields = async () => {
+      try {
+        const { data, error } = await supabaseRef.current
+          .from('profiles')
+          .select(PROFILE_ENCRYPTED_FIELDS.join(', '))
+          .eq('id', userId)
+          .single();
+
+        if (error || !data || !encryptionKeyRef.current || isCancelled) {
+          return;
+        }
+
+        const profileData = data as unknown as EncryptedProfileSubset;
+        const updates: Partial<Record<EncryptedProfileField, string>> = {};
+
+        for (const field of PROFILE_ENCRYPTED_FIELDS) {
+          const value = profileData[field];
+          if (typeof value === 'string' && value && !isEncrypted(value)) {
+            updates[field] = await encrypt(value, encryptionKeyRef.current);
+          }
+        }
+
+        hasMigratedProfileRef.current = true;
+
+        if (Object.keys(updates).length === 0 || isCancelled) {
+          return;
+        }
+
+        const { error: updateError } = await supabaseRef.current
+          .from('profiles')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('Error encrypting profile fields:', updateError);
+          hasMigratedProfileRef.current = false;
+        }
+      } catch (error) {
+        console.error('Error migrating profile encryption:', error);
+        hasMigratedProfileRef.current = false;
+      }
+    };
+
+    migrateProfileFields();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId, state.isUnlocked]);
 
   // Set up encryption for a new user
   const setupEncryption = useCallback(async (passphrase: string): Promise<{ error: string | null }> => {
@@ -265,6 +332,7 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
   // Lock encryption (clear key from memory)
   const lockEncryption = useCallback(() => {
     encryptionKeyRef.current = null;
+    hasMigratedProfileRef.current = false;
     setState(prev => ({ ...prev, isUnlocked: false }));
   }, []);
 
@@ -313,4 +381,3 @@ export function useEncryptionProvider({ userId }: EncryptionProviderOptions) {
 
 export { EncryptionContext };
 export type { EncryptionContextType };
-

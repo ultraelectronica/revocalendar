@@ -281,6 +281,8 @@ export default function TimezoneSelector({
     return (seconds / 60) * 360;
   }, [time]);
 
+  const [timeValue, meridiem = ''] = formattedTime.split(' ');
+
   return (
     <>
       {/* Compact Time Display Card */}
@@ -289,19 +291,96 @@ export default function TimezoneSelector({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`
-          w-full glass-card p-4 transition-all duration-500 group cursor-pointer text-left
+          w-full glass-card p-3 sm:p-4 transition-all duration-500 group cursor-pointer text-left
           ${isHovered ? 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] ring-1 ring-cyan-500/20' : ''}
         `}
       >
-        <div className="flex items-center justify-between">
-          {/* Left: Time Display with Orbital Animation */}
+        <div className="min-[420px]:hidden space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{currentTimezoneInfo.city}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-white/40">
+                <span>{currentTimezoneInfo.abbr}</span>
+                <span className="text-white/20">•</span>
+                <span>{formattedDate}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pl-2">
+              {offsetFromLocal && timezone !== localTimezone && (
+                <div
+                  className={`
+                    rounded-full border px-2 py-1 text-[10px] font-medium whitespace-nowrap
+                    ${offsetFromLocal.startsWith('+')
+                      ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400'
+                      : 'border-violet-500/30 bg-violet-500/20 text-violet-400'
+                    }
+                  `}
+                >
+                  {offsetFromLocal}
+                </div>
+              )}
+
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 transition-colors group-hover:bg-cyan-500/20">
+                <svg
+                  className="h-4 w-4 text-white/40 transition-colors group-hover:text-cyan-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.03] px-3 py-3">
+            <div className="relative h-12 w-12 flex-shrink-0 flex items-center justify-center">
+              <div className="absolute h-4 w-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/40" />
+              <div
+                className="absolute h-full w-full rounded-full border border-cyan-500/30"
+                style={{
+                  transform: `rotate(${orbitalRotation}deg)`,
+                  transition: 'transform 1s linear',
+                }}
+              >
+                <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 shadow-lg shadow-cyan-500/50" />
+              </div>
+              <div
+                className="absolute h-9 w-9 rounded-full border border-violet-500/20"
+                style={{
+                  transform: `rotate(${-orbitalRotation * 0.7}deg)`,
+                  transition: 'transform 1s linear',
+                }}
+              >
+                <div className="absolute -top-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-violet-400/70" />
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-end gap-2">
+                <span className="text-[clamp(1.85rem,10vw,2.35rem)] font-bold font-mono leading-none text-white tracking-tight text-glow-cyan">
+                  {timeValue}
+                </span>
+                <span className="pb-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400/80">
+                  {meridiem}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] uppercase tracking-[0.24em] text-white/30">Tap to change timezone</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden min-[420px]:flex min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-4">
           <div className="flex items-center gap-4">
-            {/* Orbital Clock Icon */}
             <div className="relative w-12 h-12 flex items-center justify-center">
-              {/* Static sun/core */}
               <div className="absolute w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/40" />
 
-              {/* Orbiting ring */}
               <div
                 className="absolute w-full h-full rounded-full border border-cyan-500/30"
                 style={{
@@ -309,11 +388,9 @@ export default function TimezoneSelector({
                   transition: 'transform 1s linear',
                 }}
               >
-                {/* Orbiting dot (planet) */}
                 <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 shadow-lg shadow-cyan-500/50" />
               </div>
 
-              {/* Second orbit ring */}
               <div
                 className="absolute w-9 h-9 rounded-full border border-violet-500/20"
                 style={{
@@ -325,29 +402,26 @@ export default function TimezoneSelector({
               </div>
             </div>
 
-            {/* Time & Date */}
             <div className="text-left">
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold font-mono text-white tracking-wide text-glow-cyan">
-                  {formattedTime.split(' ')[0]}
+                  {timeValue}
                 </span>
                 <span className="text-sm font-medium text-cyan-400/80">
-                  {formattedTime.split(' ')[1]}
+                  {meridiem}
                 </span>
               </div>
               <p className="text-xs text-white/40">{formattedDate}</p>
             </div>
           </div>
 
-          {/* Right: Timezone Info */}
           <div className="flex items-center gap-3">
-            {/* Offset Indicator */}
             {offsetFromLocal && timezone !== localTimezone && (
               <div
                 className={`
                   px-2 py-1 rounded-md text-xs font-medium animate-pulse-subtle
-                  ${offsetFromLocal.startsWith('+') 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  ${offsetFromLocal.startsWith('+')
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
                   }
                 `}
@@ -356,7 +430,6 @@ export default function TimezoneSelector({
               </div>
             )}
 
-            {/* City & Timezone */}
             <div className="text-right">
               <p className="text-sm font-semibold text-white">
                 {currentTimezoneInfo.city}
@@ -364,7 +437,6 @@ export default function TimezoneSelector({
               <p className="text-xs text-white/40">{currentTimezoneInfo.abbr}</p>
             </div>
 
-            {/* Change Icon */}
             <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
               <svg
                 className="w-4 h-4 text-white/40 group-hover:text-cyan-400 transition-colors"
